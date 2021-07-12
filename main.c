@@ -1,0 +1,1024 @@
+#define _CRT_SECURE_NO_WARNINGS
+#include <windows.h>
+#include <stdio.h>
+#include "forwards.h"
+
+#define DIRECTINPUT_VERSION 0x0800
+#include <dinput.h>
+#include <stdint.h>
+#pragma comment(lib, "Dinput8.lib")
+#pragma comment(lib, "Dxguid.lib")
+
+
+
+void* g_game_ptr = NULL;
+void* g_world_ptr = 0x0095C770;
+
+DWORD* ai_current_player = NULL;
+DWORD* fancy_player_ptr = NULL;
+
+
+
+
+uint8_t color_ramp_function(float ratio, int period_duration, int cur_time) {
+
+	if (cur_time <= 0 || 4*period_duration <= cur_time)
+		return 0;
+
+	if (cur_time < period_duration) {
+
+		float calc = ratio * cur_time;
+
+		return min(calc, 1.0f) * 255;
+	}
+
+
+	if (period_duration <= cur_time && cur_time <= 3 * period_duration) {
+		return 255;
+	}
+
+
+	if (cur_time <= 4 * period_duration) {
+
+		int adjusted_time = cur_time - 3 * period_duration;
+		float calc = 1.f - ratio * adjusted_time;
+
+		return min(calc, 1.0f) * 255;
+	}
+
+}
+
+typedef struct {
+	BYTE unk[256];//not sure how big
+}mString;
+
+#define MAX_CHARS_SAFE 63
+#define MAX_CHARS MAX_CHARS_SAFE+1
+#define EXTEND_NEW_ENTRIES 20
+#define MAX_ELEMENTS_PAGE 18
+
+#pragma pack(1)
+typedef struct {
+	//uint8_t unk[0x134];
+	uint8_t unk[0xA4];
+	float x;
+	float y;
+	float z;
+	uint8_t unk1[0x84];
+}region;
+
+typedef struct {
+
+	char text[MAX_CHARS];	 
+	void* data;
+
+}debug_menu_entry;
+
+typedef void (*menu_handler_function)(debug_menu_entry*);
+typedef void (*go_back_function)();
+
+typedef struct {
+	char title[MAX_CHARS];
+	DWORD capacity;
+	DWORD used_slots;
+	DWORD window_start;
+	DWORD cur_index;
+	go_back_function go_back;
+	menu_handler_function handler;
+	debug_menu_entry* entries;
+}debug_menu;
+
+
+
+debug_menu* start_debug = NULL;
+debug_menu* warp_menu = NULL;
+debug_menu* char_select_menu = NULL;
+debug_menu* current_menu = NULL;
+
+
+void goto_start_debug() {
+	current_menu = start_debug;
+}
+
+
+void add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
+
+	if (menu->used_slots < menu->capacity) {
+		memcpy(&menu->entries[menu->used_slots], entry, sizeof(debug_menu_entry));
+		menu->used_slots++;
+	}
+	else {
+		DWORD current_entries_size = sizeof(debug_menu_entry) * menu->capacity;
+		DWORD new_entries_size = sizeof(debug_menu_entry) * EXTEND_NEW_ENTRIES;
+
+
+		void* new_ptr = realloc(menu->entries, current_entries_size + new_entries_size);
+
+		if (!new_ptr) {
+			printf("RIP\n");
+			__debugbreak();
+		}
+		else {
+
+			menu->capacity += EXTEND_NEW_ENTRIES;
+			menu->entries = new_ptr;
+			memset(&menu->entries[menu->used_slots], 0, new_entries_size);
+
+			add_debug_menu_entry(menu, entry);
+		}				
+	}
+}
+
+
+
+
+debug_menu* create_menu(const char* title, go_back_function go_back, menu_handler_function function , DWORD capacity) {
+
+	debug_menu* menu = malloc(sizeof(debug_menu));
+	memset(menu, 0, sizeof(debug_menu));
+
+	strncpy(menu->title, title, MAX_CHARS_SAFE);
+
+	menu->capacity = capacity;
+	menu->handler = function;
+	menu->go_back = go_back;
+
+	DWORD total_entries_size = sizeof(debug_menu_entry) * capacity;
+	menu->entries = malloc(total_entries_size);
+	memset(menu->entries, 0, total_entries_size);
+
+	return menu;
+
+}
+
+typedef (__fastcall* mString_constructor_ptr)(mString* this, void* edx, char* str);
+mString_constructor_ptr mString_constructor = 0x00421100;
+
+typedef (__fastcall* mString_finalize_ptr)(mString* this, void* edx, int zero);
+mString_finalize_ptr mString_finalize = 0x004209C0;
+
+
+region** all_regions = 0x0095C924;
+DWORD* number_of_allocated_regions = 0x0095C920;
+
+typedef (__fastcall* region_get_name_ptr)(void* this);
+region_get_name_ptr region_get_name = 0x00519BB0;
+
+
+void set_text_writeable() {
+
+	const DWORD text_end = 0x86F000;
+	const DWORD text_start = 0x401000;
+
+	DWORD old;
+	VirtualProtect((void*)text_start, text_end - text_start, PAGE_EXECUTE_READWRITE, &old);
+
+}
+
+void HookFunc(DWORD callAdd, DWORD funcAdd, BOOLEAN jump, const unsigned char* reason) {
+
+	//Only works for E8/E9 hooks	
+	DWORD jmpOff = funcAdd - callAdd - 5;
+
+	BYTE shellcode[] = { 0, 0, 0, 0, 0 };
+	shellcode[0] = jump ? 0xE9 : 0xE8;
+
+	memcpy(&shellcode[1], &jmpOff, sizeof(jmpOff));
+	memcpy((void*)callAdd, shellcode, sizeof(shellcode));
+
+	if (reason)
+		printf("Hook: %08X -  %s\n", callAdd, reason);
+
+}
+
+
+void WriteDWORD(DWORD* address, DWORD newValue, const unsigned char* reason) {
+	*address = newValue;
+	if (reason)
+		printf("Wrote: %08X -  %s\n", address, reason);
+}
+
+typedef int (*nflSystemOpenFile_ptr)(HANDLE* hHandle, LPCSTR lpFileName, unsigned int a3, LARGE_INTEGER liDistanceToMove);
+nflSystemOpenFile_ptr nflSystemOpenFile_orig = NULL;
+
+nflSystemOpenFile_ptr *nflSystemOpenFile_data = (void*)0x0094985C;
+
+
+HANDLE USM_handle = INVALID_HANDLE_VALUE;
+
+int nflSystemOpenFile(HANDLE* hHandle, LPCSTR lpFileName, unsigned int a3, LARGE_INTEGER liDistanceToMove) {
+
+	printf("Opening file %s\n", lpFileName);
+	int ret =  nflSystemOpenFile_orig(hHandle, lpFileName, a3, liDistanceToMove);
+
+
+	if (strstr(lpFileName, "ultimate_spiderman.PCPACK")) {
+	
+	}
+	return ret;
+}
+
+
+
+typedef int (*ReadOrWrite_ptr)(int a1, HANDLE* a2, int a3, DWORD a4, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite);
+ReadOrWrite_ptr *ReadOrWrite_data = (void*)0x0094986C;
+ReadOrWrite_ptr ReadOrWrite_orig = NULL;
+
+int ReadOrWrite(int a1, HANDLE* a2, int a3, DWORD a4, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) {
+
+	int ret = ReadOrWrite_orig(a1, a2, a3, a4, lpBuffer, nNumberOfBytesToWrite);
+
+	if (USM_handle == *a2) {
+		printf("USM buffer was read %08X\n", (DWORD)lpBuffer);
+		
+		
+	}
+	return ret;
+}
+
+
+typedef void (*aeps_RenderAll_ptr)();
+aeps_RenderAll_ptr aeps_RenderAll_orig = (void*)0x004D9310;
+
+void **nglSysFont = (void**)0x00975208;
+
+typedef void (*nglListAddString_ptr)(void* font, float x, float y, float z, DWORD color, float x_scale, float y_scale, char *format, ...);
+nglListAddString_ptr nglListAddString = (void*)0x00779E90;
+
+
+
+#define nglColor(r,g,b,a) ( (a << 24) |  (r << 16) | (g << 8) | (b & 255) )
+
+
+typedef struct {
+	BYTE unk[100];
+}nglQuad;
+
+typedef void (*nglInitQuad_ptr)(void*);
+nglInitQuad_ptr nglInitQuad = (void*)0x0077AC40;
+
+
+typedef void (*nglSetQuadRect_ptr)(void*, float, float, float, float);
+nglSetQuadRect_ptr nglSetQuadRect = 0x0077AD30;
+
+
+typedef void (*nglSetQuadColor_ptr)(void*, unsigned int);
+nglSetQuadColor_ptr nglSetQuadColor = 0x0077AD10;
+
+
+typedef void (*nglListAddQuad_ptr)(void*);
+nglListAddQuad_ptr nglListAddQuad = 0x0077AFE0;
+
+
+typedef int (*nglListBeginScene_ptr)(int);
+nglListBeginScene_ptr nglListBeginScene = 0x0076C970;
+
+
+typedef void (*nglListEndScene_ptr)();
+nglListEndScene_ptr nglListEndScene = 0x00742B50;
+
+
+typedef void (*nglSetQuadZ_ptr)(void*, float);
+nglSetQuadZ_ptr nglSetQuadZ = 0x0077AD70;
+
+typedef void (*nglSetClearFlags_ptr)(int);
+nglSetClearFlags_ptr nglSetClearFlags = 0x00769DB0;
+
+void aeps_RenderAll() {
+
+
+
+	static cur_time = 0;
+	int period = 60;
+	int duration = 6 * period;
+	float ratio = 1.f / period;
+
+	uint8_t red = color_ramp_function(ratio, period, cur_time + 2*period) + color_ramp_function(ratio, period, cur_time - 4*period);
+	uint8_t green = color_ramp_function(ratio, period, cur_time);
+	uint8_t blue = color_ramp_function(ratio, period, cur_time - 2*period);
+
+	nglListAddString(*nglSysFont, 0.1f, 0.2f, 0.2f, nglColor(red, green, blue, 255), 1.f, 1.f, "Krystalgamer's Debug menu");
+
+	cur_time = (cur_time + 1) % duration;
+
+	
+	aeps_RenderAll_orig();
+}
+
+
+int debug_enabled = 0;
+uint32_t keys[256];
+
+
+
+
+typedef int (*nglGetStringDimensions_ptr)(int, char* EndPtr, int*, int*, float, float);
+nglGetStringDimensions_ptr nglGetStringDimensions = 0x007798E0;
+
+
+
+void getStringDimensions(char* str, int* width, int* height) {
+	nglGetStringDimensions(*nglSysFont, str, width, height, 1.0, 1.0);
+}
+
+int getStringHeight(char* str) {
+	int height;
+	nglGetStringDimensions(*nglSysFont, str, NULL, &height, 1.0, 1.0);
+	return height;
+}
+
+
+void render_current_debug_menu() {
+
+
+#define UP_ARROW " ^ ^ ^ "
+#define DOWN_ARROW " v v v "
+
+
+	int num_elements = min(MAX_ELEMENTS_PAGE, current_menu->used_slots - current_menu->window_start);
+	int needs_down_arrow = ((current_menu->window_start + MAX_ELEMENTS_PAGE) < current_menu->used_slots) ? 1 : 0;
+
+
+	int cur_width, cur_height;
+	int debug_width = 0;
+	int debug_height = 0;
+
+#define get_and_update(x) {\
+	 getStringDimensions(x, &cur_width, &cur_height); \
+	 debug_height += cur_height; \
+	 debug_width = max(debug_width, cur_width);\
+	}
+	 //printf("new size: %s %d %d (%d %d)\n", x, debug_width, debug_height, cur_width, cur_height); \
+
+
+	get_and_update(current_menu->title);
+	get_and_update(UP_ARROW);
+	
+
+
+
+
+	int total_elements_page = needs_down_arrow ? MAX_ELEMENTS_PAGE : current_menu->used_slots - current_menu->window_start;
+
+	for (int i = 0; i < total_elements_page; i++) {
+		char* cur = current_menu->entries[current_menu->window_start + i].text;
+		get_and_update(cur);
+	}
+
+
+	if (needs_down_arrow) {
+		get_and_update(DOWN_ARROW);
+	}
+
+	nglQuad quad;
+
+
+	int menu_x_start = 20, menu_y_start = 40;
+	int menu_x_pad = 24, menu_y_pad = 18;
+
+	nglInitQuad(&quad);
+	nglSetQuadRect(&quad, menu_x_start, menu_y_start, menu_x_start+debug_width+ menu_x_pad, menu_y_start+debug_height+menu_y_pad);
+	nglSetQuadColor(&quad, 0xBE0A0A0A);
+	nglSetQuadZ(&quad, 0.5f);
+	nglListAddQuad(&quad);
+
+
+	int white_color = nglColor(255, 255, 255, 255);
+	int yellow_color = nglColor(255, 255, 0, 255);
+	int green_color = nglColor(0, 255, 0, 255);
+	int pink_color = nglColor(255, 0, 255, 255);
+
+
+	int render_height = menu_y_start;
+	render_height += 12;
+	int render_x = menu_x_start;
+	render_x += 8;
+	nglListAddString(*nglSysFont, render_x, render_height, 0.2f, green_color, 1.f, 1.f, current_menu->title);
+	render_height += getStringHeight(current_menu->title);
+
+
+	if (current_menu->window_start) {
+		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, pink_color, 1.f, 1.f, UP_ARROW);
+	}
+	render_height += getStringHeight(UP_ARROW);
+
+
+
+	for (int i = 0; i < total_elements_page; i++) {
+
+		int current_color = current_menu->cur_index == i ? yellow_color : white_color;
+		char* cur = current_menu->entries[current_menu->window_start + i].text;
+		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, current_color, 1.f, 1.f, cur);
+		render_height += getStringHeight(cur);
+	}
+
+	if (needs_down_arrow) {
+		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, pink_color, 1.f, 1.f, DOWN_ARROW);
+		render_height += getStringHeight(DOWN_ARROW);
+	}
+
+
+
+
+}
+void myDebugMenu() {
+
+
+	if (debug_enabled) {
+		render_current_debug_menu();
+	}
+	nglListEndScene();
+}
+
+
+typedef int (*wndHandler_ptr)(HWND, UINT, WPARAM, LPARAM);
+wndHandler_ptr orig_WindowHandler = 0x005941A0;
+
+int WindowHandler(HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
+
+	switch (Msg) {
+		case WM_SYSKEYDOWN:
+		case WM_SYSKEYUP:
+		case WM_KEYUP:
+		case WM_KEYDOWN:
+		case WM_INPUT:
+			printf("swallowed keypress\n");
+			return;
+	}
+
+	return orig_WindowHandler(hwnd, Msg, wParam, lParam);
+
+}
+
+/*
+	STDMETHOD(GetDeviceState)(THIS_ DWORD,LPVOID) PURE;
+	STDMETHOD(GetDeviceData)(THIS_ DWORD,LPDIDEVICEOBJECTDATA,LPDWORD,DWORD) PURE;
+	
+*/
+
+
+typedef int (__stdcall* GetDeviceState_ptr)(IDirectInputDevice8*, DWORD, LPVOID);
+GetDeviceState_ptr GetDeviceStateOriginal = NULL;
+
+
+
+typedef (__fastcall* game_pause_unpause_ptr)(void* this);
+game_pause_unpause_ptr game_pause = 0x0054FBE0;
+game_pause_unpause_ptr game_unpause = 0x0053A880;
+
+
+
+
+typedef (__fastcall* game_get_cur_state_ptr)(void* this);
+game_get_cur_state_ptr game_get_cur_state = 0x005363D0;
+
+
+
+typedef (__fastcall* world_dynamics_system_remove_player_ptr)(void* this, void* edx, int number);
+world_dynamics_system_remove_player_ptr world_dynamics_system_remove_player = 0x00558550;
+
+
+typedef (__fastcall* world_dynamics_system_add_player_ptr)(void* this, void* edx, mString *str);
+world_dynamics_system_add_player_ptr world_dynamics_system_add_player = 0x0055B400;
+
+
+DWORD changing_model = 0;
+char* current_costume = "ultimate_spiderman";
+
+
+typedef (*entity_teleport_abs_po_ptr)(DWORD, float*, int one);
+entity_teleport_abs_po_ptr entity_teleport_abs_po = 0x004F3890;
+
+
+typedef DWORD* (__fastcall* ai_ai_core_get_info_node_ptr)(DWORD* this, void* edx, int a2, char a3);
+ai_ai_core_get_info_node_ptr ai_ai_core_get_info_node = 0x006A3390;
+
+
+DWORD modulo(int num, DWORD mod) {
+	if (num >= 0) {
+		return num % mod;
+	}
+
+	int absolute = abs(num);
+	if (absolute % mod == 0)
+		return 0;
+
+
+	return mod - absolute % mod;
+}
+
+
+void menu_go_down() {
+
+	
+	if ((current_menu->window_start + MAX_ELEMENTS_PAGE) < current_menu->used_slots) {
+
+		if (current_menu->cur_index < MAX_ELEMENTS_PAGE / 2)
+			current_menu->cur_index++;
+		else
+			current_menu->window_start++;
+	}
+	else {
+
+		int num_elements = min(MAX_ELEMENTS_PAGE, current_menu->used_slots - current_menu->window_start);
+		current_menu->cur_index = modulo(current_menu->cur_index + 1, num_elements);
+		if (current_menu->cur_index == 0)
+			current_menu->window_start = 0;
+	}
+}
+
+void menu_go_up() {
+
+
+	int num_elements = min(MAX_ELEMENTS_PAGE, current_menu->used_slots - current_menu->window_start);
+	if (current_menu->window_start) {
+		
+
+		if (current_menu->cur_index > MAX_ELEMENTS_PAGE / 2)
+			current_menu->cur_index--;
+		else
+			current_menu->window_start--;
+
+	}
+	else {
+
+		int num_elements = min(MAX_ELEMENTS_PAGE, current_menu->used_slots - current_menu->window_start);
+		current_menu->cur_index = modulo(current_menu->cur_index - 1, num_elements);
+		if (current_menu->cur_index == (num_elements - 1))
+			current_menu->window_start = current_menu->used_slots - num_elements;
+
+	}
+
+}
+
+int sort_warp_entries(debug_menu_entry* entry1, debug_menu_entry* entry2) {
+	return strcmp(entry1->text, entry2->text);
+}
+
+HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LPVOID lpvData) {
+
+
+	HRESULT res = GetDeviceStateOriginal(this, cbData, lpvData);
+
+
+	//keyboard time babyyy
+	if (cbData == 256) {
+
+		BYTE* keysCurrent = lpvData;
+
+		for (int i = 0; i < 256; i++) {
+
+			if (keysCurrent[i]) {
+				keys[i]++;
+			}
+			else {
+				keys[i] = 0;
+			}
+		}
+
+		int game_state = 0;
+		if(g_game_ptr)
+			game_state = game_get_cur_state(g_game_ptr);
+
+
+		//debug menu stuff
+		if (keys[DIK_INSERT] == 2 && (game_state == 6 || game_state == 7)) {
+
+			
+			if (debug_enabled && game_state == 7) {
+				game_unpause(g_game_ptr);
+				debug_enabled = !debug_enabled;
+			}
+			else if (!debug_enabled && game_state == 6) {
+				game_pause(g_game_ptr);
+				debug_enabled = !debug_enabled;
+				current_menu = start_debug;
+			}
+
+			if (warp_menu->used_slots == 0) {
+				for (int i = 0; i < *number_of_allocated_regions; i++) {
+					region* cur_region = &(*all_regions)[i];
+					char* region_name = region_get_name(cur_region);
+
+					debug_menu_entry warp_entry = { "", cur_region };
+					strcpy(warp_entry.text, region_name);
+					add_debug_menu_entry(warp_menu, &warp_entry);
+
+					
+				}
+				qsort(warp_menu->entries, *number_of_allocated_regions, sizeof(debug_menu_entry), sort_warp_entries);
+
+
+			}
+
+			
+			
+				
+		}
+
+
+		if (debug_enabled) {
+			
+
+
+#define SCROLL_SPEED 4
+			if (keys[DIK_DOWNARROW]) {
+
+				if (keys[DIK_DOWNARROW] == 1) {
+					menu_go_down();
+				}
+				else if (keys[DIK_DOWNARROW] >= SCROLL_SPEED && keys[DIK_DOWNARROW] % SCROLL_SPEED == 0) {
+					menu_go_down();
+				}
+			}
+			else if (keys[DIK_UPARROW]) {
+
+				if (keys[DIK_UPARROW] == 1) {
+					menu_go_up();
+				}
+				else if (keys[DIK_UPARROW] >= SCROLL_SPEED && keys[DIK_UPARROW] % SCROLL_SPEED == 0) {
+					menu_go_up();
+				}
+			}
+			else if (keys[DIK_RETURN] == 2) {
+				current_menu->handler(&current_menu->entries[current_menu->window_start+current_menu->cur_index]);
+			}
+			else if (keys[DIK_ESCAPE] == 2) {
+				current_menu->go_back();
+			}
+
+
+		}
+
+	}
+
+
+	if (debug_enabled) {
+		memset(lpvData, 0, cbData);
+	}
+	
+
+
+	//printf("Device State called %08X %d\n", this, cbData);
+
+	return res;
+}
+
+typedef HRESULT (__stdcall *GetDeviceData_ptr)(IDirectInputDevice8*, DWORD, LPDIDEVICEOBJECTDATA, LPDWORD, DWORD);
+GetDeviceData_ptr GetDeviceDataOriginal = NULL;
+
+HRESULT __stdcall GetDeviceDataHook(IDirectInputDevice8* this, DWORD cbObjectData, LPDIDEVICEOBJECTDATA rgdod, LPDWORD pdwInOut, DWORD dwFlags) {
+
+	HRESULT res = GetDeviceDataOriginal(this, cbObjectData, rgdod, pdwInOut, dwFlags);
+
+
+	if (res == DI_OK) {
+
+		printf("All gud\n");
+		for (int i = 0; i < *pdwInOut; i++) {
+
+
+			if (LOBYTE(rgdod[i].dwData) > 0) {
+
+				if (rgdod[i].dwOfs == DIK_ESCAPE) {
+
+					printf("Pressed escaped\n");
+					__debugbreak();
+				}
+			}
+		}
+	}
+	//printf("Device Data called %08X\n", this);
+
+	return res;
+}
+
+
+
+typedef HRESULT(__stdcall* IDirectInput8CreateDevice_ptr)(IDirectInput8W*, const GUID* , LPDIRECTINPUTDEVICE8W*, LPUNKNOWN);
+IDirectInput8CreateDevice_ptr createDeviceOriginal = NULL;
+
+HRESULT  __stdcall IDirectInput8CreateDeviceHook(IDirectInput8W *this, const GUID* guid, LPDIRECTINPUTDEVICE8W* device, LPUNKNOWN unk) {
+
+	//printf("CreateDevice %d %d %d %d %d %d %d\n", *guid, GUID_SysMouse, GUID_SysKeyboard, GUID_SysKeyboardEm, GUID_SysKeyboardEm2, GUID_SysMouseEm, GUID_SysMouseEm2);
+
+
+	HRESULT res = createDeviceOriginal(this, guid, device, unk);
+
+	DWORD* vtbl = (*device)->lpVtbl;
+	if (!GetDeviceStateOriginal) {
+		GetDeviceStateOriginal = vtbl[9];
+		vtbl[9] = GetDeviceStateHook;
+	}
+
+	if (!GetDeviceDataOriginal) {
+		GetDeviceDataOriginal = vtbl[10];
+		vtbl[10] = GetDeviceDataHook;
+	}
+
+	return res;
+}
+
+typedef HRESULT(__stdcall* IDirectInput8Release_ptr)(IDirectInput8W*);
+IDirectInput8Release_ptr releaseDeviceOriginal = NULL;
+
+HRESULT  __stdcall IDirectInput8ReleaseHook(IDirectInput8W* this) {
+
+	printf("Release\n");
+
+	return releaseDeviceOriginal(this);
+}
+
+
+BOOL CALLBACK EnumDevices(LPCDIDEVICEINSTANCE lpddi, LPVOID buffer) {
+
+	wchar_t wGUID[40] = { 0 };
+	char cGUID[40] = { 0 };
+
+	//printf("%d\n", lpddi->guidProduct);
+}
+
+typedef HRESULT(__stdcall *DirectInput8Create_ptr)(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID* ppvOut, LPUNKNOWN punkOuter);
+HRESULT __stdcall HookDirectInput8Create(HINSTANCE hinst,	DWORD dwVersion, REFIID riidltf, LPVOID* ppvOut, LPUNKNOWN punkOuter)
+{
+	DirectInput8Create_ptr caller = *(void**)0x00987944;
+	HRESULT res = caller(hinst, dwVersion, riidltf, ppvOut, punkOuter);
+
+
+	IDirectInput8** iDir = ppvOut;
+	printf("it's me mario %08X %08X\n", ppvOut, (*iDir)->lpVtbl);
+	
+
+	DWORD* vtbl = (DWORD*)(*iDir)->lpVtbl;
+	if (!createDeviceOriginal) {
+		createDeviceOriginal = vtbl[3];
+		vtbl[3] = IDirectInput8CreateDeviceHook;
+	}
+
+
+	//(*iDir)->lpVtbl->EnumDevices(*iDir, DI8DEVCLASS_ALL, EnumDevices, NULL, DIEDFL_ALLDEVICES);
+	return res;
+}
+
+
+DWORD hookDirectInputAddress = HookDirectInput8Create;
+
+
+void update_state() {
+
+	while (1) {
+		OutputDebugStringA("PILA %d", 6);
+	}
+}
+
+typedef int(__fastcall* game_handle_game_states_ptr)(void* this, void* edx, void* a2);
+game_handle_game_states_ptr game_handle_game_states_original = 0x0055D510;
+
+int __fastcall game_handle_game_states(void* this, void* edx, void *a2) {
+
+	if (!g_game_ptr) {
+		g_game_ptr = this;
+	}
+
+	if (changing_model) {
+
+
+		changing_model--;
+
+		if (!changing_model) {
+			mString str;
+			mString_constructor(&str, NULL, current_costume);
+			world_dynamics_system_add_player(*(DWORD*)g_world_ptr, NULL, &str);
+			mString_finalize(&str, NULL, 0);
+			game_unpause(g_game_ptr);
+		}
+	}
+
+	/*
+	if (game_get_cur_state(this) == 14)
+		__debugbreak();
+		*/
+
+
+	//printf("Current state %d %08X\n", game_get_cur_state(this), g_game_ptr);
+
+	return game_handle_game_states_original(this, edx, a2);
+}
+
+typedef void(__fastcall* sub_41F9D0_ptr)(char* this, void *edx, const char* a2, signed int a3);
+sub_41F9D0_ptr sub_41F9D0 = 0x41F9D0;
+
+
+void __fastcall sub_41F9D0_hook(char* this, void* edx, const char* a2, signed int a3) {
+
+	//printf("mString:%s\n", a2);
+
+	
+	return sub_41F9D0(this, edx, a2, a3);
+}
+
+typedef DWORD (__fastcall* ai_hero_base_state_check_transition_ptr)(DWORD* this, void* edx, DWORD* a2, int a3);
+ai_hero_base_state_check_transition_ptr ai_hero_base_state_check_transition = 0x00478D80;
+
+DWORD __fastcall ai_hero_base_state_check_transition_hook(DWORD* this, void* edx, DWORD* a2, int a3) {
+	ai_current_player = this;
+	return ai_hero_base_state_check_transition(this, edx, a2, a3);
+}
+
+
+typedef DWORD* (__fastcall* get_info_node_ptr)(void* this, void* edx, int a2, char a3);
+get_info_node_ptr get_info_node = 0x006A3390;
+
+DWORD* __fastcall get_info_node_hook(void* this, void* edx, int a2, char a3) {
+
+	DWORD* res = get_info_node(this, edx, a2, a3);
+
+	fancy_player_ptr = res;
+	return res;
+}
+
+void install_patches() {
+
+	HookFunc(0x004EACF0, (DWORD)aeps_RenderAll, 0, "Patching call to aeps::RenderAll");
+
+	HookFunc(0x0052B5D7, (DWORD)myDebugMenu, 0, "Hooking nglListEndScene to inject debug menu");
+	//save orig ptr
+	nflSystemOpenFile_orig = *nflSystemOpenFile_data;
+	*nflSystemOpenFile_data = &nflSystemOpenFile;
+	printf("Replaced nflSystemOpenFile %08X -> %08X\n", (DWORD)nflSystemOpenFile_orig, (DWORD)&nflSystemOpenFile);
+
+
+	ReadOrWrite_orig = *ReadOrWrite_data;
+	*ReadOrWrite_data = &ReadOrWrite;
+	printf("Replaced ReadOrWrite %08X -> %08X\n", (DWORD)ReadOrWrite_orig, (DWORD)&ReadOrWrite);
+
+
+	*(DWORD*)0x008218B2 = &hookDirectInputAddress;
+	printf("Patching the DirectInput8Create call\n");
+
+
+	HookFunc(0x0055D742, (DWORD)game_handle_game_states, 0, "Hooking handle_game_states");
+
+	HookFunc(0x00421128, (DWORD)sub_41F9D0_hook, 0, "Hooking sub_41F9D0");
+
+
+	/*
+	WriteDWORD(0x00877524, ai_hero_base_state_check_transition_hook, "Hooking check_transition for peter hooded");
+	WriteDWORD(0x00877560, ai_hero_base_state_check_transition_hook, "Hooking check_transition for spider-man");
+	WriteDWORD(0x0087759C, ai_hero_base_state_check_transition_hook, "Hooking check_transition for venom");
+	*/
+
+	HookFunc(0x00478DBF, get_info_node_hook, 0, "Hook get_info_node to get player ptr");
+
+	/*
+
+	DWORD* windowHandler = 0x005AC48B;
+	*windowHandler = WindowHandler;
+
+	DWORD* otherHandler = 0x0076D6D1;
+	*otherHandler = 0;
+
+	*/
+
+}
+
+
+void handle_debug_entry(debug_menu_entry* entry) {
+	current_menu = entry->data;
+}
+
+void handle_warp_entry(debug_menu_entry* entry) {
+	debug_enabled = 0;
+
+	float position[] = {
+		0, -0, 1, 0,
+		1, -0, -0, 0,
+		0, 1, 0, 0,
+		-203, 20, 430, 1
+	};
+
+	/*
+	DWORD arg1 = *(DWORD*)0x96C158;
+	DWORD* some_ptr = ai_ai_core_get_info_node(ai_current_player[5], NULL, arg1, 1);
+	printf("WHYYYY %08X %08X\n", fancy_player_ptr, some_ptr);
+	*/
+
+
+	region* cur_region = entry->data;
+	position[12] = cur_region->x;
+	position[13] = cur_region->y;
+	position[14] = cur_region->z;
+
+	game_unpause(g_game_ptr);
+	entity_teleport_abs_po(fancy_player_ptr[3], position, 1);
+}
+
+void handle_char_select_entry(debug_menu_entry* entry) {
+
+	DWORD* some_number = (*(DWORD**)g_world_ptr) + 142;
+
+	while (*some_number) {
+		//printf("some_number %d\n", *some_number);
+		world_dynamics_system_remove_player(*(DWORD*)g_world_ptr, NULL, *some_number - 1);
+	}
+
+	debug_enabled = 0;
+	changing_model = 2;
+	current_costume = entry->text;
+
+}
+
+
+void close_debug() {
+	debug_enabled = 0;
+	game_unpause(g_game_ptr);
+}
+
+void setup_debug_menu() {
+
+	start_debug = create_menu("Debug Menu", close_debug, handle_debug_entry, 2);
+	warp_menu = create_menu("Warp", goto_start_debug, handle_warp_entry, 300);
+	char_select_menu = create_menu("Char Select", goto_start_debug, handle_char_select_entry, 5);
+	
+	debug_menu_entry warp_entry = { "Warp", warp_menu };
+	debug_menu_entry char_select = { "Char Select", char_select_menu};
+
+	add_debug_menu_entry(start_debug, &warp_entry);
+	add_debug_menu_entry(start_debug, &char_select);
+
+	char* costumes[] = {
+		"ultimate_spiderman",
+		"arachno_man_costume",
+		"usm_wrestling_costume",
+		"usm_blacksuit_costume",
+		"peter_parker",
+		"peter_parker_costume",
+		"peter_hooded",
+		"peter_hooded_costume",
+		"venom",
+		"venom_spider"
+	};
+
+
+	for (int i = 0; i < sizeof(costumes) / sizeof(char*); i++) {
+		debug_menu_entry char_entry;
+		strcpy(char_entry.text, costumes[i]);
+
+		add_debug_menu_entry(char_select_menu, &char_entry);
+	}
+
+	/*
+	
+	
+
+	
+	for (int i = 0; i < 5; i++) {
+		
+		debug_menu_entry asdf;
+		sprintf(asdf.text, "entry %d", i);
+		printf("AQUI %s\n", asdf.text);
+
+		add_debug_menu_entry(start_debug, &asdf);
+	}
+	
+
+	add_debug_menu_entry(start_debug, &teste);
+	*/
+}
+
+
+BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID reserverd) {
+
+
+
+	if (sizeof(region) != 0x134)
+		__debugbreak();
+
+
+	
+
+	memset(keys, 0, sizeof(keys));
+	if (fdwReason == DLL_PROCESS_ATTACH) {
+		AllocConsole();
+
+
+
+		if (!freopen("CONOUT$", "w", stdout)) {
+			MessageBoxA(NULL, "Error", "Couldn't allocate console...Closing", 0);
+			return FALSE;
+		}
+
+		setup_debug_menu();
+		set_text_writeable();
+		install_patches();
+
+	}
+	else if (fdwReason == DLL_PROCESS_DETACH)
+		FreeConsole();
+
+	return TRUE;
+}
+
+int main() {
+	return 0;
+}
