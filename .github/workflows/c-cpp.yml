@@ -1,0 +1,29 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: windows-2019
+
+    steps:
+
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.2
+    - uses: actions/checkout@v2
+    - name: Compile
+      run: msbuild /p:Platform=x86 /p:Configuration=Release
+    - name: Prepare binaries
+      shell: pwsh
+      run: |
+          mkdir output
+          cp Release\usm_debug_menu.dll output\binkw32.dll
+          cp README.md output\.
+    - uses: actions/upload-artifact@v2
+      with:
+        path: output
