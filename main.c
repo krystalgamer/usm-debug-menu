@@ -17,12 +17,15 @@ void* g_world_ptr = 0x0095C770;
 DWORD* ai_current_player = NULL;
 DWORD* fancy_player_ptr = NULL;
 
+char* injected_pack = NULL;
 
+
+DWORD for_pack_loading[2];
 
 
 uint8_t color_ramp_function(float ratio, int period_duration, int cur_time) {
 
-	if (cur_time <= 0 || 4*period_duration <= cur_time)
+	if (cur_time <= 0 || 4 * period_duration <= cur_time)
 		return 0;
 
 	if (cur_time < period_duration) {
@@ -59,17 +62,18 @@ typedef struct {
 
 #pragma pack(1)
 typedef struct {
-	//uint8_t unk[0x134];
-	uint8_t unk[0xA4];
+	uint8_t unk[0x50];
+	uint8_t status;
+	uint8_t unk1[0x53];
 	float x;
 	float y;
 	float z;
-	uint8_t unk1[0x84];
+	uint8_t unk2[0x84];
 }region;
 
 typedef struct {
 
-	char text[MAX_CHARS];	 
+	char text[MAX_CHARS];
 	void* data;
 
 }debug_menu_entry;
@@ -101,6 +105,12 @@ void goto_start_debug() {
 }
 
 
+
+void unlock_region(region* cur_region) {
+
+	cur_region->status &= 0xFE;
+}
+
 void add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 
 	if (menu->used_slots < menu->capacity) {
@@ -125,14 +135,14 @@ void add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 			memset(&menu->entries[menu->used_slots], 0, new_entries_size);
 
 			add_debug_menu_entry(menu, entry);
-		}				
+		}
 	}
 }
 
 
 
 
-debug_menu* create_menu(const char* title, go_back_function go_back, menu_handler_function function , DWORD capacity) {
+debug_menu* create_menu(const char* title, go_back_function go_back, menu_handler_function function, DWORD capacity) {
 
 	debug_menu* menu = malloc(sizeof(debug_menu));
 	memset(menu, 0, sizeof(debug_menu));
@@ -201,19 +211,20 @@ void WriteDWORD(DWORD* address, DWORD newValue, const unsigned char* reason) {
 typedef int (*nflSystemOpenFile_ptr)(HANDLE* hHandle, LPCSTR lpFileName, unsigned int a3, LARGE_INTEGER liDistanceToMove);
 nflSystemOpenFile_ptr nflSystemOpenFile_orig = NULL;
 
-nflSystemOpenFile_ptr *nflSystemOpenFile_data = (void*)0x0094985C;
+nflSystemOpenFile_ptr* nflSystemOpenFile_data = (void*)0x0094985C;
 
 
 HANDLE USM_handle = INVALID_HANDLE_VALUE;
 
 int nflSystemOpenFile(HANDLE* hHandle, LPCSTR lpFileName, unsigned int a3, LARGE_INTEGER liDistanceToMove) {
 
+
 	printf("Opening file %s\n", lpFileName);
-	int ret =  nflSystemOpenFile_orig(hHandle, lpFileName, a3, liDistanceToMove);
+	int ret = nflSystemOpenFile_orig(hHandle, lpFileName, a3, liDistanceToMove);
 
 
 	if (strstr(lpFileName, "ultimate_spiderman.PCPACK")) {
-	
+
 	}
 	return ret;
 }
@@ -221,7 +232,7 @@ int nflSystemOpenFile(HANDLE* hHandle, LPCSTR lpFileName, unsigned int a3, LARGE
 
 
 typedef int (*ReadOrWrite_ptr)(int a1, HANDLE* a2, int a3, DWORD a4, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite);
-ReadOrWrite_ptr *ReadOrWrite_data = (void*)0x0094986C;
+ReadOrWrite_ptr* ReadOrWrite_data = (void*)0x0094986C;
 ReadOrWrite_ptr ReadOrWrite_orig = NULL;
 
 int ReadOrWrite(int a1, HANDLE* a2, int a3, DWORD a4, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) {
@@ -230,8 +241,8 @@ int ReadOrWrite(int a1, HANDLE* a2, int a3, DWORD a4, LPCVOID lpBuffer, DWORD nN
 
 	if (USM_handle == *a2) {
 		printf("USM buffer was read %08X\n", (DWORD)lpBuffer);
-		
-		
+
+
 	}
 	return ret;
 }
@@ -240,9 +251,9 @@ int ReadOrWrite(int a1, HANDLE* a2, int a3, DWORD a4, LPCVOID lpBuffer, DWORD nN
 typedef void (*aeps_RenderAll_ptr)();
 aeps_RenderAll_ptr aeps_RenderAll_orig = (void*)0x004D9310;
 
-void **nglSysFont = (void**)0x00975208;
+void** nglSysFont = (void**)0x00975208;
 
-typedef void (*nglListAddString_ptr)(void* font, float x, float y, float z, DWORD color, float x_scale, float y_scale, char *format, ...);
+typedef void (*nglListAddString_ptr)(void* font, float x, float y, float z, DWORD color, float x_scale, float y_scale, char* format, ...);
 nglListAddString_ptr nglListAddString = (void*)0x00779E90;
 
 
@@ -293,15 +304,15 @@ void aeps_RenderAll() {
 	int duration = 6 * period;
 	float ratio = 1.f / period;
 
-	uint8_t red = color_ramp_function(ratio, period, cur_time + 2*period) + color_ramp_function(ratio, period, cur_time - 4*period);
+	uint8_t red = color_ramp_function(ratio, period, cur_time + 2 * period) + color_ramp_function(ratio, period, cur_time - 4 * period);
 	uint8_t green = color_ramp_function(ratio, period, cur_time);
-	uint8_t blue = color_ramp_function(ratio, period, cur_time - 2*period);
+	uint8_t blue = color_ramp_function(ratio, period, cur_time - 2 * period);
 
 	nglListAddString(*nglSysFont, 0.1f, 0.2f, 0.2f, nglColor(red, green, blue, 255), 1.f, 1.f, "Krystalgamer's Debug menu");
 
 	cur_time = (cur_time + 1) % duration;
 
-	
+
 	aeps_RenderAll_orig();
 }
 
@@ -348,12 +359,12 @@ void render_current_debug_menu() {
 	 debug_height += cur_height; \
 	 debug_width = max(debug_width, cur_width);\
 	}
-	 //printf("new size: %s %d %d (%d %d)\n", x, debug_width, debug_height, cur_width, cur_height); \
+	//printf("new size: %s %d %d (%d %d)\n", x, debug_width, debug_height, cur_width, cur_height); \
 
 
 	get_and_update(current_menu->title);
 	get_and_update(UP_ARROW);
-	
+
 
 
 
@@ -377,7 +388,7 @@ void render_current_debug_menu() {
 	int menu_x_pad = 24, menu_y_pad = 18;
 
 	nglInitQuad(&quad);
-	nglSetQuadRect(&quad, menu_x_start, menu_y_start, menu_x_start+debug_width+ menu_x_pad, menu_y_start+debug_height+menu_y_pad);
+	nglSetQuadRect(&quad, menu_x_start, menu_y_start, menu_x_start + debug_width + menu_x_pad, menu_y_start + debug_height + menu_y_pad);
 	nglSetQuadColor(&quad, 0xBE0A0A0A);
 	nglSetQuadZ(&quad, 0.5f);
 	nglListAddQuad(&quad);
@@ -437,13 +448,13 @@ wndHandler_ptr orig_WindowHandler = 0x005941A0;
 int WindowHandler(HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 
 	switch (Msg) {
-		case WM_SYSKEYDOWN:
-		case WM_SYSKEYUP:
-		case WM_KEYUP:
-		case WM_KEYDOWN:
-		case WM_INPUT:
-			printf("swallowed keypress\n");
-			return;
+	case WM_SYSKEYDOWN:
+	case WM_SYSKEYUP:
+	case WM_KEYUP:
+	case WM_KEYDOWN:
+	case WM_INPUT:
+		printf("swallowed keypress\n");
+		return;
 	}
 
 	return orig_WindowHandler(hwnd, Msg, wParam, lParam);
@@ -453,11 +464,11 @@ int WindowHandler(HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 /*
 	STDMETHOD(GetDeviceState)(THIS_ DWORD,LPVOID) PURE;
 	STDMETHOD(GetDeviceData)(THIS_ DWORD,LPDIDEVICEOBJECTDATA,LPDWORD,DWORD) PURE;
-	
+
 */
 
 
-typedef int (__stdcall* GetDeviceState_ptr)(IDirectInputDevice8*, DWORD, LPVOID);
+typedef int(__stdcall* GetDeviceState_ptr)(IDirectInputDevice8*, DWORD, LPVOID);
 GetDeviceState_ptr GetDeviceStateOriginal = NULL;
 
 
@@ -478,7 +489,7 @@ typedef (__fastcall* world_dynamics_system_remove_player_ptr)(void* this, void* 
 world_dynamics_system_remove_player_ptr world_dynamics_system_remove_player = 0x00558550;
 
 
-typedef (__fastcall* world_dynamics_system_add_player_ptr)(void* this, void* edx, mString *str);
+typedef (__fastcall* world_dynamics_system_add_player_ptr)(void* this, void* edx, mString* str);
 world_dynamics_system_add_player_ptr world_dynamics_system_add_player = 0x0055B400;
 
 
@@ -510,7 +521,7 @@ DWORD modulo(int num, DWORD mod) {
 
 void menu_go_down() {
 
-	
+
 	if ((current_menu->window_start + MAX_ELEMENTS_PAGE) < current_menu->used_slots) {
 
 		if (current_menu->cur_index < MAX_ELEMENTS_PAGE / 2)
@@ -532,7 +543,7 @@ void menu_go_up() {
 
 	int num_elements = min(MAX_ELEMENTS_PAGE, current_menu->used_slots - current_menu->window_start);
 	if (current_menu->window_start) {
-		
+
 
 		if (current_menu->cur_index > MAX_ELEMENTS_PAGE / 2)
 			current_menu->cur_index--;
@@ -577,14 +588,14 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 		}
 
 		int game_state = 0;
-		if(g_game_ptr)
+		if (g_game_ptr)
 			game_state = game_get_cur_state(g_game_ptr);
 
 
 		//debug menu stuff
 		if (keys[DIK_INSERT] == 2 && (game_state == 6 || game_state == 7)) {
 
-			
+
 			if (debug_enabled && game_state == 7) {
 				game_unpause(g_game_ptr);
 				debug_enabled = !debug_enabled;
@@ -604,21 +615,21 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 					strcpy(warp_entry.text, region_name);
 					add_debug_menu_entry(warp_menu, &warp_entry);
 
-					
+
 				}
 				qsort(warp_menu->entries, *number_of_allocated_regions, sizeof(debug_menu_entry), sort_warp_entries);
 
 
 			}
 
-			
-			
-				
+
+
+
 		}
 
 
 		if (debug_enabled) {
-			
+
 
 
 #define SCROLL_SPEED 4
@@ -641,7 +652,7 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 				}
 			}
 			else if (keys[DIK_RETURN] == 2) {
-				current_menu->handler(&current_menu->entries[current_menu->window_start+current_menu->cur_index]);
+				current_menu->handler(&current_menu->entries[current_menu->window_start + current_menu->cur_index]);
 			}
 			else if (keys[DIK_ESCAPE] == 2) {
 				current_menu->go_back();
@@ -656,7 +667,7 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 	if (debug_enabled) {
 		memset(lpvData, 0, cbData);
 	}
-	
+
 
 
 	//printf("Device State called %08X %d\n", this, cbData);
@@ -664,7 +675,7 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 	return res;
 }
 
-typedef HRESULT (__stdcall *GetDeviceData_ptr)(IDirectInputDevice8*, DWORD, LPDIDEVICEOBJECTDATA, LPDWORD, DWORD);
+typedef HRESULT(__stdcall* GetDeviceData_ptr)(IDirectInputDevice8*, DWORD, LPDIDEVICEOBJECTDATA, LPDWORD, DWORD);
 GetDeviceData_ptr GetDeviceDataOriginal = NULL;
 
 HRESULT __stdcall GetDeviceDataHook(IDirectInputDevice8* this, DWORD cbObjectData, LPDIDEVICEOBJECTDATA rgdod, LPDWORD pdwInOut, DWORD dwFlags) {
@@ -695,10 +706,10 @@ HRESULT __stdcall GetDeviceDataHook(IDirectInputDevice8* this, DWORD cbObjectDat
 
 
 
-typedef HRESULT(__stdcall* IDirectInput8CreateDevice_ptr)(IDirectInput8W*, const GUID* , LPDIRECTINPUTDEVICE8W*, LPUNKNOWN);
+typedef HRESULT(__stdcall* IDirectInput8CreateDevice_ptr)(IDirectInput8W*, const GUID*, LPDIRECTINPUTDEVICE8W*, LPUNKNOWN);
 IDirectInput8CreateDevice_ptr createDeviceOriginal = NULL;
 
-HRESULT  __stdcall IDirectInput8CreateDeviceHook(IDirectInput8W *this, const GUID* guid, LPDIRECTINPUTDEVICE8W* device, LPUNKNOWN unk) {
+HRESULT  __stdcall IDirectInput8CreateDeviceHook(IDirectInput8W* this, const GUID* guid, LPDIRECTINPUTDEVICE8W* device, LPUNKNOWN unk) {
 
 	//printf("CreateDevice %d %d %d %d %d %d %d\n", *guid, GUID_SysMouse, GUID_SysKeyboard, GUID_SysKeyboardEm, GUID_SysKeyboardEm2, GUID_SysMouseEm, GUID_SysMouseEm2);
 
@@ -738,8 +749,8 @@ BOOL CALLBACK EnumDevices(LPCDIDEVICEINSTANCE lpddi, LPVOID buffer) {
 	//printf("%d\n", lpddi->guidProduct);
 }
 
-typedef HRESULT(__stdcall *DirectInput8Create_ptr)(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID* ppvOut, LPUNKNOWN punkOuter);
-HRESULT __stdcall HookDirectInput8Create(HINSTANCE hinst,	DWORD dwVersion, REFIID riidltf, LPVOID* ppvOut, LPUNKNOWN punkOuter)
+typedef HRESULT(__stdcall* DirectInput8Create_ptr)(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID* ppvOut, LPUNKNOWN punkOuter);
+HRESULT __stdcall HookDirectInput8Create(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID* ppvOut, LPUNKNOWN punkOuter)
 {
 	DirectInput8Create_ptr caller = *(void**)0x00987944;
 	HRESULT res = caller(hinst, dwVersion, riidltf, ppvOut, punkOuter);
@@ -747,7 +758,7 @@ HRESULT __stdcall HookDirectInput8Create(HINSTANCE hinst,	DWORD dwVersion, REFII
 
 	IDirectInput8** iDir = ppvOut;
 	printf("it's me mario %08X %08X\n", ppvOut, (*iDir)->lpVtbl);
-	
+
 
 	DWORD* vtbl = (DWORD*)(*iDir)->lpVtbl;
 	if (!createDeviceOriginal) {
@@ -774,7 +785,7 @@ void update_state() {
 typedef int(__fastcall* game_handle_game_states_ptr)(void* this, void* edx, void* a2);
 game_handle_game_states_ptr game_handle_game_states_original = 0x0055D510;
 
-int __fastcall game_handle_game_states(void* this, void* edx, void *a2) {
+int __fastcall game_handle_game_states(void* this, void* edx, void* a2) {
 
 	if (!g_game_ptr) {
 		g_game_ptr = this;
@@ -800,12 +811,12 @@ int __fastcall game_handle_game_states(void* this, void* edx, void *a2) {
 		*/
 
 
-	//printf("Current state %d %08X\n", game_get_cur_state(this), g_game_ptr);
+		//printf("Current state %d %08X\n", game_get_cur_state(this), g_game_ptr);
 
 	return game_handle_game_states_original(this, edx, a2);
 }
 
-typedef void(__fastcall* sub_41F9D0_ptr)(char* this, void *edx, const char* a2, signed int a3);
+typedef void(__fastcall* sub_41F9D0_ptr)(char* this, void* edx, const char* a2, signed int a3);
 sub_41F9D0_ptr sub_41F9D0 = 0x41F9D0;
 
 
@@ -813,11 +824,11 @@ void __fastcall sub_41F9D0_hook(char* this, void* edx, const char* a2, signed in
 
 	//printf("mString:%s\n", a2);
 
-	
+
 	return sub_41F9D0(this, edx, a2, a3);
 }
 
-typedef DWORD (__fastcall* ai_hero_base_state_check_transition_ptr)(DWORD* this, void* edx, DWORD* a2, int a3);
+typedef DWORD(__fastcall* ai_hero_base_state_check_transition_ptr)(DWORD* this, void* edx, DWORD* a2, int a3);
 ai_hero_base_state_check_transition_ptr ai_hero_base_state_check_transition = 0x00478D80;
 
 DWORD __fastcall ai_hero_base_state_check_transition_hook(DWORD* this, void* edx, DWORD* a2, int a3) {
@@ -834,6 +845,31 @@ DWORD* __fastcall get_info_node_hook(void* this, void* edx, int a2, char a3) {
 	DWORD* res = get_info_node(this, edx, a2, a3);
 
 	fancy_player_ptr = res;
+	return res;
+}
+
+
+typedef int (_fastcall* resource_pack_streamer_load_internal_ptr)(void* this, void* edx, char* str, int a3, int a4, int a5);
+resource_pack_streamer_load_internal_ptr resource_pack_streamer_load_internal = 0x0054C580;
+
+void __fastcall resource_pack_streamer_load_internal_hook(void* this, void* edx, char* str, int a3, int a4, int a5) {
+
+
+	return resource_pack_streamer_load_internal(this, edx, str, a3, a4, a5);
+}
+
+
+
+uint8_t __fastcall os_developer_options(BYTE *this, void *edx, int flag) {
+
+	char** flag_list = 0x936420;
+	char* flag_text = flag_list[flag];
+		
+	uint8_t res = this[flag + 4];
+	//printf("Game wants to know about: %d (%s) -> %d\n", flag, flag_text, res);
+	
+	this[5 + 4] = 1;
+	
 	return res;
 }
 
@@ -869,6 +905,10 @@ void install_patches() {
 	*/
 
 	HookFunc(0x00478DBF, get_info_node_hook, 0, "Hook get_info_node to get player ptr");
+
+	//HookFunc(0x0054C89C, resource_pack_streamer_load_internal_hook, 0, "Hooking resource_pack_streamer::load_internal to inject interior loading");
+
+	//HookFunc(0x005B87E0, os_developer_options, 1, "Hooking os_developer_options::get_flag");
 
 	/*
 
@@ -909,6 +949,10 @@ void handle_warp_entry(debug_menu_entry* entry) {
 	position[13] = cur_region->y;
 	position[14] = cur_region->z;
 
+
+	unlock_region(cur_region);
+
+		
 	game_unpause(g_game_ptr);
 	entity_teleport_abs_po(fancy_player_ptr[3], position, 1);
 }
@@ -939,9 +983,9 @@ void setup_debug_menu() {
 	start_debug = create_menu("Debug Menu", close_debug, handle_debug_entry, 2);
 	warp_menu = create_menu("Warp", goto_start_debug, handle_warp_entry, 300);
 	char_select_menu = create_menu("Char Select", goto_start_debug, handle_char_select_entry, 5);
-	
+
 	debug_menu_entry warp_entry = { "Warp", warp_menu };
-	debug_menu_entry char_select = { "Char Select", char_select_menu};
+	debug_menu_entry char_select = { "Char Select", char_select_menu };
 
 	add_debug_menu_entry(start_debug, &warp_entry);
 	add_debug_menu_entry(start_debug, &char_select);
@@ -968,19 +1012,19 @@ void setup_debug_menu() {
 	}
 
 	/*
-	
-	
 
-	
+
+
+
 	for (int i = 0; i < 5; i++) {
-		
+
 		debug_menu_entry asdf;
 		sprintf(asdf.text, "entry %d", i);
 		printf("AQUI %s\n", asdf.text);
 
 		add_debug_menu_entry(start_debug, &asdf);
 	}
-	
+
 
 	add_debug_menu_entry(start_debug, &teste);
 	*/
@@ -991,11 +1035,10 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID reserverd) {
 
 
 
-	if (sizeof(region) != 0x134)
+	if (sizeof(region) != 0x134) {
 		__debugbreak();
 
-
-	
+	}
 
 	memset(keys, 0, sizeof(keys));
 	if (fdwReason == DLL_PROCESS_ATTACH) {
