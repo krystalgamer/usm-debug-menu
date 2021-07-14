@@ -16,6 +16,7 @@ Get the menu from [here](https://github.com/krystalgamer/usm-debug-menu/releases
 * **INSERT** - opens and closes the menu
 * **UP/DOWN Arrows** - moves the current select option up and down
 * **ENTER** - executes the selected option
+* **LEFT/RIGHT Arrows** - changes the value of the current **boolean** option
 * **ESCAPE** - go to previous menu
 
 ## Current implemented options
@@ -29,6 +30,10 @@ Allows to teleport to any in-game region
 Allows to switch between *all* available characters
 
 **NOTE**: `peter_parker` and `peter_hooded` are versions of peter without powers, used in the first missions of the game
+
+### Options
+
+Allows to modify in-game flags that controls certain behaviours.
 
 ## Extending functionality
 

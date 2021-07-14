@@ -23,6 +23,7 @@ char* injected_pack = NULL;
 DWORD for_pack_loading[2];
 
 
+
 uint8_t color_ramp_function(float ratio, int period_duration, int cur_time) {
 
 	if (cur_time <= 0 || 4 * period_duration <= cur_time)
@@ -71,9 +72,16 @@ typedef struct {
 	uint8_t unk2[0x84];
 }region;
 
+
+typedef enum {
+	NORMAL,
+	BOOLEAN_E
+}debug_menu_entry_type;
+
 typedef struct {
 
 	char text[MAX_CHARS];
+	debug_menu_entry_type entry_type;
 	void* data;
 
 }debug_menu_entry;
@@ -97,6 +105,7 @@ typedef struct {
 debug_menu* start_debug = NULL;
 debug_menu* warp_menu = NULL;
 debug_menu* char_select_menu = NULL;
+debug_menu* options_menu = NULL;
 debug_menu* current_menu = NULL;
 
 
@@ -339,9 +348,25 @@ int getStringHeight(char* str) {
 }
 
 
+char* getRealText(debug_menu_entry* entry, char* str) {
+
+
+
+	if (entry->entry_type == BOOLEAN_E) {
+		BYTE* val = entry->data;
+		sprintf(str, "%s: %s", entry->text, *val ? "True" : "False");
+		return str;
+	}
+
+
+	return entry->text;
+}
+
 void render_current_debug_menu() {
 
 
+
+	char text_buffer[128];
 #define UP_ARROW " ^ ^ ^ "
 #define DOWN_ARROW " v v v "
 
@@ -372,7 +397,9 @@ void render_current_debug_menu() {
 	int total_elements_page = needs_down_arrow ? MAX_ELEMENTS_PAGE : current_menu->used_slots - current_menu->window_start;
 
 	for (int i = 0; i < total_elements_page; i++) {
-		char* cur = current_menu->entries[current_menu->window_start + i].text;
+
+		debug_menu_entry *entry = &current_menu->entries[current_menu->window_start + i];
+		char* cur = getRealText(entry, text_buffer);
 		get_and_update(cur);
 	}
 
@@ -418,7 +445,9 @@ void render_current_debug_menu() {
 	for (int i = 0; i < total_elements_page; i++) {
 
 		int current_color = current_menu->cur_index == i ? yellow_color : white_color;
-		char* cur = current_menu->entries[current_menu->window_start + i].text;
+
+		debug_menu_entry* entry = &current_menu->entries[current_menu->window_start + i];
+		char* cur = getRealText(entry, text_buffer);
 		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, current_color, 1.f, 1.f, cur);
 		render_height += getStringHeight(cur);
 	}
@@ -611,7 +640,7 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 					region* cur_region = &(*all_regions)[i];
 					char* region_name = region_get_name(cur_region);
 
-					debug_menu_entry warp_entry = { "", cur_region };
+					debug_menu_entry warp_entry = { "", NORMAL, cur_region };
 					strcpy(warp_entry.text, region_name);
 					add_debug_menu_entry(warp_menu, &warp_entry);
 
@@ -656,6 +685,10 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 			}
 			else if (keys[DIK_ESCAPE] == 2) {
 				current_menu->go_back();
+			}
+			else if (keys[DIK_LEFTARROW] == 2 || keys[DIK_RIGHTARROW] == 2) {
+				if(current_menu->entries[current_menu->window_start + current_menu->cur_index].entry_type == BOOLEAN_E)
+				current_menu->handler(&current_menu->entries[current_menu->window_start + current_menu->cur_index]);
 			}
 
 
@@ -973,6 +1006,12 @@ void handle_char_select_entry(debug_menu_entry* entry) {
 }
 
 
+void handle_options_select_entry(debug_menu_entry* entry) {
+
+	BYTE* val = entry->data;
+	*val = !*val;
+}
+
 void close_debug() {
 	debug_enabled = 0;
 	game_unpause(g_game_ptr);
@@ -983,12 +1022,15 @@ void setup_debug_menu() {
 	start_debug = create_menu("Debug Menu", close_debug, handle_debug_entry, 2);
 	warp_menu = create_menu("Warp", goto_start_debug, handle_warp_entry, 300);
 	char_select_menu = create_menu("Char Select", goto_start_debug, handle_char_select_entry, 5);
+	options_menu = create_menu("Options", goto_start_debug, handle_options_select_entry, 2);
 
-	debug_menu_entry warp_entry = { "Warp", warp_menu };
-	debug_menu_entry char_select = { "Char Select", char_select_menu };
+	debug_menu_entry warp_entry = { "Warp", NORMAL, warp_menu };
+	debug_menu_entry char_select = { "Char Select", NORMAL, char_select_menu };
+	debug_menu_entry options_entry = { "Options", NORMAL, options_menu };
 
 	add_debug_menu_entry(start_debug, &warp_entry);
 	add_debug_menu_entry(start_debug, &char_select);
+	add_debug_menu_entry(start_debug, &options_entry);
 
 	char* costumes[] = {
 		"ultimate_spiderman",
@@ -1006,10 +1048,19 @@ void setup_debug_menu() {
 
 	for (int i = 0; i < sizeof(costumes) / sizeof(char*); i++) {
 		debug_menu_entry char_entry;
+		char_entry.entry_type = NORMAL;
 		strcpy(char_entry.text, costumes[i]);
 
 		add_debug_menu_entry(char_select_menu, &char_entry);
 	}
+
+
+	debug_menu_entry show_fps = { "Show FPS", BOOLEAN_E, 0x975848 };
+	debug_menu_entry memory_info = { "Memory Info", BOOLEAN_E, 0x975849 };
+
+	add_debug_menu_entry(options_menu, &show_fps);
+	add_debug_menu_entry(options_menu, &memory_info);
+
 
 	/*
 
