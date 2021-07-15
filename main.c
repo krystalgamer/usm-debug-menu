@@ -651,7 +651,12 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 
 			}
 
-
+			
+			if (options_menu->used_slots == 2) {
+				BYTE* arr = *(DWORD*)0x96858C;
+				debug_menu_entry render_fe = { "Render FE UI ", BOOLEAN_E,  &arr[4+0x90]};
+				add_debug_menu_entry(options_menu, &render_fe);
+			}
 
 
 		}
@@ -1057,6 +1062,7 @@ void setup_debug_menu() {
 
 	debug_menu_entry show_fps = { "Show FPS", BOOLEAN_E, 0x975848 };
 	debug_menu_entry memory_info = { "Memory Info", BOOLEAN_E, 0x975849 };
+	
 
 	add_debug_menu_entry(options_menu, &show_fps);
 	add_debug_menu_entry(options_menu, &memory_info);
