@@ -24,6 +24,8 @@ DWORD for_pack_loading[2];
 
 
 
+
+
 uint8_t color_ramp_function(float ratio, int period_duration, int cur_time) {
 
 	if (cur_time <= 0 || 4 * period_duration <= cur_time)
@@ -51,6 +53,13 @@ uint8_t color_ramp_function(float ratio, int period_duration, int cur_time) {
 	}
 
 }
+
+
+typedef struct _list{
+	struct _list* next;
+	struct _list* prev;
+	void* data;
+}list;
 
 typedef struct {
 	BYTE unk[256];//not sure how big
@@ -83,6 +92,7 @@ typedef struct {
 	char text[MAX_CHARS];
 	debug_menu_entry_type entry_type;
 	void* data;
+	void* data1;
 
 }debug_menu_entry;
 
@@ -106,7 +116,21 @@ debug_menu* start_debug = NULL;
 debug_menu* warp_menu = NULL;
 debug_menu* char_select_menu = NULL;
 debug_menu* options_menu = NULL;
+debug_menu* script_menu = NULL;
+debug_menu* progression_menu = NULL;
+
+
+debug_menu** all_menus[] = {
+	&start_debug,
+	&warp_menu,
+	&char_select_menu,
+	&options_menu,
+	&script_menu,
+	&progression_menu
+};
+
 debug_menu* current_menu = NULL;
+
 
 
 void goto_start_debug() {
@@ -120,11 +144,39 @@ void unlock_region(region* cur_region) {
 	cur_region->status &= 0xFE;
 }
 
-void add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
+void remove_debug_menu_entry(debug_menu_entry* entry) {
+	
+
+	DWORD to_be = (DWORD)entry;
+	for (int i = 0; i < (sizeof(all_menus) / sizeof(void*)); i++) {
+
+		debug_menu *cur = *all_menus[i];
+
+		DWORD start = cur->entries;
+		DWORD end = start + cur->used_slots * sizeof(debug_menu_entry);
+
+		if (start <= entry && entry < end) {
+
+
+			int index = (to_be - start) / sizeof(debug_menu_entry);
+
+			memcpy(&cur->entries[index], &cur->entries[index + 1], cur->used_slots - (index + 1));
+			memset(&cur->entries[cur->used_slots - 1], 0, sizeof(debug_menu_entry));
+			cur->used_slots--;
+			return;
+		}
+		
+	}
+
+}
+
+void* add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 
 	if (menu->used_slots < menu->capacity) {
-		memcpy(&menu->entries[menu->used_slots], entry, sizeof(debug_menu_entry));
+		void* ret = &menu->entries[menu->used_slots];
+		memcpy(ret, entry, sizeof(debug_menu_entry));
 		menu->used_slots++;
+		return ret;
 	}
 	else {
 		DWORD current_entries_size = sizeof(debug_menu_entry) * menu->capacity;
@@ -143,7 +195,7 @@ void add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 			menu->entries = new_ptr;
 			memset(&menu->entries[menu->used_slots], 0, new_entries_size);
 
-			add_debug_menu_entry(menu, entry);
+			return add_debug_menu_entry(menu, entry);
 		}
 	}
 }
@@ -170,6 +222,40 @@ debug_menu* create_menu(const char* title, go_back_function go_back, menu_handle
 
 }
 
+
+int vm_debug_menu_entry_garbage_collection_id = -1;
+
+typedef int (*script_manager_register_allocated_stuff_callback_ptr)(void* func);
+script_manager_register_allocated_stuff_callback_ptr script_manager_register_allocated_stuff_callback = 0x005AFE40;
+
+typedef int (*construct_client_script_libs_ptr)();
+construct_client_script_libs_ptr construct_client_script_libs = 0x0058F9C0;
+
+
+void vm_debug_menu_entry_garbage_collection_callback(void* a1, list* lst) {
+
+	list* end = lst->prev;
+
+	for (list* cur = end->next; cur != end; cur = cur->next) {
+
+		debug_menu_entry* entry = ((debug_menu_entry*)cur->data);
+		printf("Will delete %s %08X\n", entry->text, entry);
+		remove_debug_menu_entry(entry);
+	}
+	
+}
+
+int construct_client_script_libs_hook() {
+
+
+	if (vm_debug_menu_entry_garbage_collection_id == -1) {
+		int res = script_manager_register_allocated_stuff_callback(vm_debug_menu_entry_garbage_collection_callback);
+		vm_debug_menu_entry_garbage_collection_id = res;
+	}
+	return construct_client_script_libs();
+}
+
+
 typedef (__fastcall* mString_constructor_ptr)(mString* this, void* edx, char* str);
 mString_constructor_ptr mString_constructor = 0x00421100;
 
@@ -191,7 +277,15 @@ void set_text_writeable() {
 
 	DWORD old;
 	VirtualProtect((void*)text_start, text_end - text_start, PAGE_EXECUTE_READWRITE, &old);
+}
 
+void set_rdata_writeable() {
+
+	const DWORD end = 0x91B000;
+	const DWORD start = 0x86F564;
+
+	DWORD old;
+	VirtualProtect((void*)start, end - start, PAGE_READWRITE, &old);
 }
 
 void HookFunc(DWORD callAdd, DWORD funcAdd, BOOLEAN jump, const unsigned char* reason) {
@@ -228,7 +322,7 @@ HANDLE USM_handle = INVALID_HANDLE_VALUE;
 int nflSystemOpenFile(HANDLE* hHandle, LPCSTR lpFileName, unsigned int a3, LARGE_INTEGER liDistanceToMove) {
 
 
-	printf("Opening file %s\n", lpFileName);
+	//printf("Opening file %s\n", lpFileName);
 	int ret = nflSystemOpenFile_orig(hHandle, lpFileName, a3, liDistanceToMove);
 
 
@@ -532,6 +626,142 @@ entity_teleport_abs_po_ptr entity_teleport_abs_po = 0x004F3890;
 
 typedef DWORD* (__fastcall* ai_ai_core_get_info_node_ptr)(DWORD* this, void* edx, int a2, char a3);
 ai_ai_core_get_info_node_ptr ai_ai_core_get_info_node = 0x006A3390;
+
+
+
+struct vm_executable;
+
+
+
+typedef struct {
+	uint8_t unk[0x20];
+	struct vm_executable** vmexecutable;
+}script_object;
+
+typedef struct {
+	uint8_t unk[0x2C];
+	script_object* object;
+}script_instance;
+
+
+typedef struct {
+	DWORD unk;
+}script_executable;
+
+typedef struct unknown_struct {
+	DWORD unk;
+	script_executable* scriptexecutable;
+}unknown_struct;
+
+typedef struct vm_executable{
+	unknown_struct* unk_struct;
+	DWORD unk[2];
+	DWORD params;
+}vm_executable;
+
+typedef struct {
+	uint8_t unk[0xC];
+	script_instance* instance;
+	vm_executable* vmexecutable;
+}vm_thread;
+
+typedef struct {
+	uint8_t unk[0x184];
+	DWORD stack_ptr;
+	vm_thread* thread;
+}slf;
+
+
+
+typedef struct {
+	DWORD unk[32];
+}string_hash;
+
+typedef void(__fastcall* string_hash_initialize_ptr)(string_hash* this, void* edx, int a2, char* Str1, int a4);
+string_hash_initialize_ptr string_hash_initialize = 0x00547A00;
+
+
+typedef int(__fastcall* script_object_find_func_ptr)(script_object* this, void* edx, string_hash* a2);
+script_object_find_func_ptr script_object_find_func = 0x0058EF80;
+
+
+typedef DWORD  (__fastcall *script_executable_add_allocated_stuff_ptr)(script_executable* this, void *edx, int a2, int a3, int a4);
+script_executable_add_allocated_stuff_ptr script_executable_add_allocated_stuff = 0x005A34B0;
+
+void vm_stack_push(slf* function, void* data, DWORD size) {
+	memcpy(function->stack_ptr, data, size);
+	function->stack_ptr += size;
+}
+
+void vm_stack_pop(slf* function, DWORD size) {
+	function->stack_ptr -= size;
+}
+
+uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
+
+
+	vm_stack_pop(function, 8);
+
+	char** strs = (void*)function->stack_ptr;
+
+	//printf("Entry: %s -> %s\n", strs[0], strs[1]);
+
+
+	string_hash strhash;
+	string_hash_initialize(&strhash, NULL, 0, strs[1], 0);
+
+
+	script_instance* instance = function->thread->instance;
+	int functionid = script_object_find_func(instance->object, NULL, *(DWORD*)&strhash);
+
+	debug_menu_entry entry;
+	memset(&entry, 0, sizeof(entry));
+	entry.entry_type = NORMAL;
+	entry.data = instance;
+	entry.data1 = functionid;
+
+	strcpy(entry.text, strs[0]);
+
+	add_debug_menu_entry(progression_menu, &entry);
+
+
+
+
+
+
+	/*
+	if(function->thread->instance->object->vmexecutable[functionid]->params != 4)
+	*/
+	
+	int push = 0;
+	vm_stack_push(function, &push, sizeof(push));
+	return 1;
+}
+
+uint8_t __stdcall slf__create_debug_menu_entry(slf* function, void* unk) {
+	vm_stack_pop(function, 4);
+
+	char** strs = (void*)function->stack_ptr;
+
+	//printf("Entry: %s ", strs[0]);
+
+
+	debug_menu_entry entry;
+	memset(&entry, 0, sizeof(entry));
+	entry.entry_type = NORMAL;
+	strcpy(entry.text, strs[0]);
+
+	void *res = add_debug_menu_entry(script_menu, &entry);
+
+	script_executable* se = function->thread->vmexecutable->unk_struct->scriptexecutable;
+	script_executable_add_allocated_stuff(se, NULL, vm_debug_menu_entry_garbage_collection_id, res, 0);
+
+	//printf("%08X\n", res);
+
+	int push = 0;
+	vm_stack_push(function, &push, sizeof(push));
+	return 1;
+}
 
 
 DWORD modulo(int num, DWORD mod) {
@@ -906,7 +1136,7 @@ uint8_t __fastcall os_developer_options(BYTE *this, void *edx, int flag) {
 	uint8_t res = this[flag + 4];
 	//printf("Game wants to know about: %d (%s) -> %d\n", flag, flag_text, res);
 	
-	this[5 + 4] = 1;
+	//this[5 + 4] = 1;
 	
 	return res;
 }
@@ -943,6 +1173,17 @@ void install_patches() {
 	*/
 
 	HookFunc(0x00478DBF, get_info_node_hook, 0, "Hook get_info_node to get player ptr");
+
+
+	WriteDWORD(0x0089C710, slf__create_progression_menu_entry, "Hooking first ocurrence of create_progession_menu_entry");
+	WriteDWORD(0x0089C718, slf__create_progression_menu_entry, "Hooking second  ocurrence of create_progession_menu_entry");
+
+
+	WriteDWORD(0x0089AF70, slf__create_debug_menu_entry, "Hooking first ocurrence of create_debug_menu_entry");
+	WriteDWORD(0x0089C708, slf__create_debug_menu_entry, "Hooking second  ocurrence of create_debug_menu_entry");
+
+
+	HookFunc(0x005AD77D, construct_client_script_libs_hook, 0, "Hooking construct_client_script_libs to inject my vm");
 
 	//HookFunc(0x0054C89C, resource_pack_streamer_load_internal_hook, 0, "Hooking resource_pack_streamer::load_internal to inject interior loading");
 
@@ -1022,20 +1263,50 @@ void close_debug() {
 	game_unpause(g_game_ptr);
 }
 
+void handle_script_select_entry(debug_menu_entry* entry) {
+
+}
+
+
+typedef void* (__fastcall* script_instance_add_thread_ptr)(script_instance* this, void* edx, vm_executable* a1, void* a2);
+script_instance_add_thread_ptr script_instance_add_thread = 0x005AAD00;
+
+void handle_progression_select_entry(debug_menu_entry* entry) {
+
+	script_instance* instance = entry->data;
+	int functionid = entry->data1;
+
+	DWORD addr = entry;
+
+	script_instance_add_thread(instance, NULL, instance->object->vmexecutable[functionid], &addr);
+
+
+
+	close_debug();
+}
+
 void setup_debug_menu() {
 
 	start_debug = create_menu("Debug Menu", close_debug, handle_debug_entry, 2);
 	warp_menu = create_menu("Warp", goto_start_debug, handle_warp_entry, 300);
 	char_select_menu = create_menu("Char Select", goto_start_debug, handle_char_select_entry, 5);
 	options_menu = create_menu("Options", goto_start_debug, handle_options_select_entry, 2);
+	script_menu = create_menu("Script", goto_start_debug, handle_script_select_entry, 50);
+	progression_menu = create_menu("Progression", goto_start_debug, handle_progression_select_entry, 10);
+
 
 	debug_menu_entry warp_entry = { "Warp", NORMAL, warp_menu };
 	debug_menu_entry char_select = { "Char Select", NORMAL, char_select_menu };
 	debug_menu_entry options_entry = { "Options", NORMAL, options_menu };
+	debug_menu_entry script_entry = { "Script", NORMAL, script_menu };
+	debug_menu_entry progression_entry = { "Progression", NORMAL, progression_menu };
 
 	add_debug_menu_entry(start_debug, &warp_entry);
 	add_debug_menu_entry(start_debug, &char_select);
 	add_debug_menu_entry(start_debug, &options_entry);
+	//add_debug_menu_entry(start_debug, &script_entry);
+	//not working
+	add_debug_menu_entry(start_debug, &progression_entry);
 
 	char* costumes[] = {
 		"ultimate_spiderman",
@@ -1110,6 +1381,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID reserverd) {
 
 		setup_debug_menu();
 		set_text_writeable();
+		set_rdata_writeable();
 		install_patches();
 
 	}

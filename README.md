@@ -1,6 +1,6 @@
 # Ultimate Spider-Man Debug menu for PC 
 
-**Recreation** of the PS2 version's debug menu for the PC version.
+**Recreation** of the PS2 version's debug menu for the PC version
 
 ## Download
 
@@ -33,7 +33,11 @@ Allows to switch between *all* available characters
 
 ### Options
 
-Allows to modify in-game flags that controls certain behaviours.
+Allows to modify in-game flags that controls certain behaviours
+
+### Progression
+
+Set your progress to any point in the game
 
 ## Extending functionality
 
