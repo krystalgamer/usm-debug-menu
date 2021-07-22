@@ -35,6 +35,10 @@ Allows to switch between *all* available characters
 
 Allows to modify in-game flags that controls certain behaviours
 
+### Script
+
+Access to in-game scripts that allow the player to tap into debug features
+
 ### Progression
 
 Set your progress to any point in the game

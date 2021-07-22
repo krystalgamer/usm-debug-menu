@@ -168,6 +168,8 @@ void remove_debug_menu_entry(debug_menu_entry* entry) {
 		
 	}
 
+	printf("FAILED TO DEALLOCATE AN ENTRY :S %08X\n", entry);
+
 }
 
 void* add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
@@ -239,7 +241,7 @@ void vm_debug_menu_entry_garbage_collection_callback(void* a1, list* lst) {
 	for (list* cur = end->next; cur != end; cur = cur->next) {
 
 		debug_menu_entry* entry = ((debug_menu_entry*)cur->data);
-		printf("Will delete %s %08X\n", entry->text, entry);
+		//printf("Will delete %s %08X\n", entry->text, entry);
 		remove_debug_menu_entry(entry);
 	}
 	
@@ -697,6 +699,41 @@ void vm_stack_pop(slf* function, DWORD size) {
 	function->stack_ptr -= size;
 }
 
+
+uint8_t __stdcall slf__debug_menu_entry__set_handler__str(slf* function, void* unk) {
+
+	vm_stack_pop(function, 8);
+
+	void** params = (void**)function->stack_ptr;
+
+	debug_menu_entry* entry = params[0];
+	char* scrpttext = params[1];
+
+
+	string_hash strhash;
+	string_hash_initialize(&strhash, NULL, 0, scrpttext, 0);
+
+
+	script_instance* instance = function->thread->instance;
+	int functionid = script_object_find_func(instance->object, NULL, *(DWORD*)&strhash);
+	entry->data = instance;
+	entry->data1 = functionid;
+	
+	return 1;
+}
+
+uint8_t __stdcall slf__destroy_debug_menu_entry__debug_menu_entry(slf* function, void* unk) {
+
+	vm_stack_pop(function, 4);
+
+	debug_menu_entry** entry = (void*)function->stack_ptr;
+
+	remove_debug_menu_entry(*entry);
+
+	return 1;
+}
+
+
 uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
 
 
@@ -739,6 +776,7 @@ uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
 }
 
 uint8_t __stdcall slf__create_debug_menu_entry(slf* function, void* unk) {
+
 	vm_stack_pop(function, 4);
 
 	char** strs = (void*)function->stack_ptr;
@@ -758,7 +796,7 @@ uint8_t __stdcall slf__create_debug_menu_entry(slf* function, void* unk) {
 
 	//printf("%08X\n", res);
 
-	int push = 0;
+	int push = res;
 	vm_stack_push(function, &push, sizeof(push));
 	return 1;
 }
@@ -1185,6 +1223,9 @@ void install_patches() {
 
 	HookFunc(0x005AD77D, construct_client_script_libs_hook, 0, "Hooking construct_client_script_libs to inject my vm");
 
+	WriteDWORD(0x0089C720, slf__destroy_debug_menu_entry__debug_menu_entry, "Hooking destroy_debug_menu_entry");
+	WriteDWORD(0x0089C750, slf__debug_menu_entry__set_handler__str, "Hooking set_handler");
+
 	//HookFunc(0x0054C89C, resource_pack_streamer_load_internal_hook, 0, "Hooking resource_pack_streamer::load_internal to inject interior loading");
 
 	//HookFunc(0x005B87E0, os_developer_options, 1, "Hooking os_developer_options::get_flag");
@@ -1263,11 +1304,6 @@ void close_debug() {
 	game_unpause(g_game_ptr);
 }
 
-void handle_script_select_entry(debug_menu_entry* entry) {
-
-}
-
-
 typedef void* (__fastcall* script_instance_add_thread_ptr)(script_instance* this, void* edx, vm_executable* a1, void* a2);
 script_instance_add_thread_ptr script_instance_add_thread = 0x005AAD00;
 
@@ -1284,6 +1320,11 @@ void handle_progression_select_entry(debug_menu_entry* entry) {
 
 	close_debug();
 }
+
+void handle_script_select_entry(debug_menu_entry* entry) {
+	handle_progression_select_entry(entry);
+}
+
 
 void setup_debug_menu() {
 
@@ -1304,8 +1345,7 @@ void setup_debug_menu() {
 	add_debug_menu_entry(start_debug, &warp_entry);
 	add_debug_menu_entry(start_debug, &char_select);
 	add_debug_menu_entry(start_debug, &options_entry);
-	//add_debug_menu_entry(start_debug, &script_entry);
-	//not working
+	add_debug_menu_entry(start_debug, &script_entry);
 	add_debug_menu_entry(start_debug, &progression_entry);
 
 	char* costumes[] = {
