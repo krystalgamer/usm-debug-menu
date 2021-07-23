@@ -25,6 +25,10 @@ Get the menu from [here](https://github.com/krystalgamer/usm-debug-menu/releases
 
 Allows to teleport to any in-game region
 
+### District variants
+
+Allows to switch between variants of given regions
+
 ### Char Select
 
 Allows to switch between *all* available characters

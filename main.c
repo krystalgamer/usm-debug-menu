@@ -78,25 +78,41 @@ typedef struct {
 	float x;
 	float y;
 	float z;
-	uint8_t unk2[0x84];
+	uint8_t unk2[0x10];
+	DWORD district_id;
+	uint8_t unk3[0x4];
+	uint8_t variants;
+	uint8_t unk4[0x6B];
 }region;
 
 
 typedef enum {
 	NORMAL,
-	BOOLEAN_E
+	BOOLEAN_E,
+	CUSTOM
 }debug_menu_entry_type;
 
-typedef struct {
+
+typedef enum {
+	LEFT,
+	RIGHT,
+	ENTER
+}custom_key_type;
+
+
+struct _debug_menu_entry;
+typedef char* (*custom_string_generator_ptr)(struct _debug_menu_entry* entry);
+
+typedef struct _debug_menu_entry {
 
 	char text[MAX_CHARS];
 	debug_menu_entry_type entry_type;
 	void* data;
 	void* data1;
-
+	custom_string_generator_ptr custom_string_generator;
 }debug_menu_entry;
 
-typedef void (*menu_handler_function)(debug_menu_entry*);
+typedef void (*menu_handler_function)(debug_menu_entry*, custom_key_type key_type);
 typedef void (*go_back_function)();
 
 typedef struct {
@@ -114,6 +130,7 @@ typedef struct {
 
 debug_menu* start_debug = NULL;
 debug_menu* warp_menu = NULL;
+debug_menu* district_variants_menu = NULL;
 debug_menu* char_select_menu = NULL;
 debug_menu* options_menu = NULL;
 debug_menu* script_menu = NULL;
@@ -123,6 +140,7 @@ debug_menu* progression_menu = NULL;
 debug_menu** all_menus[] = {
 	&start_debug,
 	&warp_menu,
+	&district_variants_menu,
 	&char_select_menu,
 	&options_menu,
 	&script_menu,
@@ -271,6 +289,13 @@ DWORD* number_of_allocated_regions = 0x0095C920;
 typedef (__fastcall* region_get_name_ptr)(void* this);
 region_get_name_ptr region_get_name = 0x00519BB0;
 
+
+typedef int (__fastcall *region_get_district_variant_ptr)(region* this);
+region_get_district_variant_ptr region_get_district_variant = 0x005503D0;
+
+
+typedef char(__fastcall* terrain_set_district_variant_ptr)(void* this, void* edx, DWORD district_id, int variant, char one);
+terrain_set_district_variant_ptr terrain_set_district_variant = 0x00557480;
 
 void set_text_writeable() {
 
@@ -452,6 +477,11 @@ char* getRealText(debug_menu_entry* entry, char* str) {
 		BYTE* val = entry->data;
 		sprintf(str, "%s: %s", entry->text, *val ? "True" : "False");
 		return str;
+	}
+
+	if (entry->entry_type == CUSTOM) {
+
+		return entry->custom_string_generator(entry);
 	}
 
 
@@ -863,6 +893,15 @@ int sort_warp_entries(debug_menu_entry* entry1, debug_menu_entry* entry2) {
 	return strcmp(entry1->text, entry2->text);
 }
 
+
+char* district_variant_string_generator(debug_menu_entry* entry) {
+
+	char buffer[128];
+	sprintf(buffer, "%s: %d", entry->text, region_get_district_variant(entry->data));
+	return buffer;
+}
+
+
 HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LPVOID lpvData) {
 
 
@@ -910,12 +949,16 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 
 					debug_menu_entry warp_entry = { "", NORMAL, cur_region };
 					strcpy(warp_entry.text, region_name);
-					add_debug_menu_entry(warp_menu, &warp_entry);
+					add_debug_menu_entry(warp_menu, &warp_entry);	
 
-
-				}
+					if (cur_region->variants >= 2) {
+						warp_entry.entry_type = CUSTOM;
+						warp_entry.custom_string_generator = district_variant_string_generator;
+						add_debug_menu_entry(district_variants_menu, &warp_entry);
+					}
+}
 				qsort(warp_menu->entries, *number_of_allocated_regions, sizeof(debug_menu_entry), sort_warp_entries);
-
+				qsort(district_variants_menu->entries, district_variants_menu->used_slots, sizeof(debug_menu_entry), sort_warp_entries);
 
 			}
 
@@ -926,6 +969,7 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 				add_debug_menu_entry(options_menu, &render_fe);
 			}
 
+			
 
 		}
 
@@ -954,14 +998,16 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 				}
 			}
 			else if (keys[DIK_RETURN] == 2) {
-				current_menu->handler(&current_menu->entries[current_menu->window_start + current_menu->cur_index]);
+				current_menu->handler(&current_menu->entries[current_menu->window_start + current_menu->cur_index], ENTER);
 			}
 			else if (keys[DIK_ESCAPE] == 2) {
 				current_menu->go_back();
 			}
 			else if (keys[DIK_LEFTARROW] == 2 || keys[DIK_RIGHTARROW] == 2) {
-				if(current_menu->entries[current_menu->window_start + current_menu->cur_index].entry_type == BOOLEAN_E)
-				current_menu->handler(&current_menu->entries[current_menu->window_start + current_menu->cur_index]);
+
+				debug_menu_entry* cur = &current_menu->entries[current_menu->window_start + current_menu->cur_index];
+				if(cur->entry_type == BOOLEAN_E || cur->entry_type == CUSTOM)
+					current_menu->handler(cur, (keys[DIK_LEFTARROW] == 2 ? LEFT : RIGHT));
 			}
 
 
@@ -1326,6 +1372,27 @@ void handle_script_select_entry(debug_menu_entry* entry) {
 }
 
 
+void handle_distriction_variants_select_entry(debug_menu_entry* entry, custom_key_type key_type) {
+
+	region* reg = entry->data;
+	void* terrain_ptr = *(*(DWORD***)g_world_ptr + 0x6B);
+	int variants = reg->variants;
+	int current_variant = region_get_district_variant(reg);
+	DWORD district_id = reg->district_id;
+
+	switch (key_type) {
+
+	case LEFT:
+		terrain_set_district_variant(terrain_ptr, NULL, district_id, modulo(current_variant-1, variants), 1);
+		break;
+	case RIGHT:
+		terrain_set_district_variant(terrain_ptr, NULL, district_id, modulo(current_variant+1, variants), 1);
+		break;
+	default:
+		return;
+	}
+}
+
 void setup_debug_menu() {
 
 	start_debug = create_menu("Debug Menu", close_debug, handle_debug_entry, 2);
@@ -1334,6 +1401,7 @@ void setup_debug_menu() {
 	options_menu = create_menu("Options", goto_start_debug, handle_options_select_entry, 2);
 	script_menu = create_menu("Script", goto_start_debug, handle_script_select_entry, 50);
 	progression_menu = create_menu("Progression", goto_start_debug, handle_progression_select_entry, 10);
+	district_variants_menu = create_menu("District variants", goto_start_debug, handle_distriction_variants_select_entry, 15);
 
 
 	debug_menu_entry warp_entry = { "Warp", NORMAL, warp_menu };
@@ -1341,8 +1409,10 @@ void setup_debug_menu() {
 	debug_menu_entry options_entry = { "Options", NORMAL, options_menu };
 	debug_menu_entry script_entry = { "Script", NORMAL, script_menu };
 	debug_menu_entry progression_entry = { "Progression", NORMAL, progression_menu };
+	debug_menu_entry district_entry = { "District variants", NORMAL, district_variants_menu };
 
 	add_debug_menu_entry(start_debug, &warp_entry);
+	add_debug_menu_entry(start_debug, &district_entry);
 	add_debug_menu_entry(start_debug, &char_select);
 	add_debug_menu_entry(start_debug, &options_entry);
 	add_debug_menu_entry(start_debug, &script_entry);
