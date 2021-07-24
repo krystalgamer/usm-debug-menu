@@ -25,6 +25,8 @@ Get the menu from [here](https://github.com/krystalgamer/usm-debug-menu/releases
 
 Allows to teleport to any in-game region
 
+**NOTE**: Points of Interest(POI) are only used in missions and the option only works when the direction arrow is visible 
+
 ### District variants
 
 Allows to switch between variants of given regions
@@ -38,6 +40,8 @@ Allows to switch between *all* available characters
 ### Options
 
 Allows to modify in-game flags that controls certain behaviours
+
+* Live in Glass House: disables the `Area unavailable` messages
 
 ### Script
 

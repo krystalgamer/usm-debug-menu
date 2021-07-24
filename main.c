@@ -943,11 +943,17 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 			}
 
 			if (warp_menu->used_slots == 0) {
+
+				debug_menu_entry poi = { "--- WARP TO POI ---", NORMAL, NULL };
+				poi.data1 = 1;
+				add_debug_menu_entry(warp_menu, &poi);
+
 				for (int i = 0; i < *number_of_allocated_regions; i++) {
 					region* cur_region = &(*all_regions)[i];
 					char* region_name = region_get_name(cur_region);
 
 					debug_menu_entry warp_entry = { "", NORMAL, cur_region };
+					warp_entry.data1 = 0;
 					strcpy(warp_entry.text, region_name);
 					add_debug_menu_entry(warp_menu, &warp_entry);	
 
@@ -1224,7 +1230,12 @@ uint8_t __fastcall os_developer_options(BYTE *this, void *edx, int flag) {
 	char* flag_text = flag_list[flag];
 		
 	uint8_t res = this[flag + 4];
-	//printf("Game wants to know about: %d (%s) -> %d\n", flag, flag_text, res);
+
+	if (flag == 0x90) {
+		printf("Game wants to know about: %d (%s) -> %d\n", flag, flag_text, res);
+		__debugbreak();
+	}
+	
 	
 	//this[5 + 4] = 1;
 	
@@ -1294,13 +1305,20 @@ void install_patches() {
 
 }
 
+void close_debug() {
+	debug_enabled = 0;
+	game_unpause(g_game_ptr);
+}
 
 void handle_debug_entry(debug_menu_entry* entry) {
 	current_menu = entry->data;
 }
 
+typedef char (__fastcall *entity_tracker_manager_get_the_arrow_target_pos_ptr)(DWORD* this, void* edx, DWORD* a2);
+entity_tracker_manager_get_the_arrow_target_pos_ptr entity_tracker_manager_get_the_arrow_target_pos = 0x0062EE10;
+
 void handle_warp_entry(debug_menu_entry* entry) {
-	debug_enabled = 0;
+	
 
 	float position[] = {
 		0, -0, 1, 0,
@@ -1316,16 +1334,25 @@ void handle_warp_entry(debug_menu_entry* entry) {
 	*/
 
 
-	region* cur_region = entry->data;
-	position[12] = cur_region->x;
-	position[13] = cur_region->y;
-	position[14] = cur_region->z;
+	float final_pos[3] = { -203, 20, 430 };
+	if (entry->data1 == 0) {
+		region* cur_region = entry->data;
+		final_pos[0] = cur_region->x;
+		final_pos[1] = cur_region->y;
+		final_pos[2] = cur_region->z;
+		unlock_region(cur_region);
+	}
+	else {
+		int res = entity_tracker_manager_get_the_arrow_target_pos( *(*(DWORD***)0x937B18 + 21), NULL, final_pos);
+		if (!res)
+			return;
+	}
 
+	position[12] = final_pos[0];
+	position[13] = final_pos[1];
+	position[14] = final_pos[2];
 
-	unlock_region(cur_region);
-
-		
-	game_unpause(g_game_ptr);
+	close_debug();
 	entity_teleport_abs_po(fancy_player_ptr[3], position, 1);
 }
 
@@ -1349,11 +1376,6 @@ void handle_options_select_entry(debug_menu_entry* entry) {
 
 	BYTE* val = entry->data;
 	*val = !*val;
-}
-
-void close_debug() {
-	debug_enabled = 0;
-	game_unpause(g_game_ptr);
 }
 
 typedef void* (__fastcall* script_instance_add_thread_ptr)(script_instance* this, void* edx, vm_executable* a1, void* a2);
