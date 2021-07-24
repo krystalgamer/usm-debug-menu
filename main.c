@@ -967,6 +967,12 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 				BYTE* arr = *(DWORD*)0x96858C;
 				debug_menu_entry render_fe = { "Render FE UI ", BOOLEAN_E,  &arr[4+0x90]};
 				add_debug_menu_entry(options_menu, &render_fe);
+
+
+				BYTE* flags = *(BYTE**)0x0096858C;
+				debug_menu_entry live_in_glass_house = { "Live in Glass House ", BOOLEAN_E,  &flags[4+0x7A]};
+				add_debug_menu_entry(options_menu, &live_in_glass_house);
+
 			}
 
 			
