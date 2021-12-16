@@ -979,6 +979,18 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LP
 				debug_menu_entry live_in_glass_house = { "Live in Glass House ", BOOLEAN_E,  &flags[4+0x7A]};
 				add_debug_menu_entry(options_menu, &live_in_glass_house);
 
+
+				BYTE* god_mode = 0x95A6A8;
+				debug_menu_entry god_mode_entry = { "God Mode ", BOOLEAN_E,  &god_mode[0] };
+				debug_menu_entry mega_god_mode = { "Mega God Mode ", BOOLEAN_E,  &god_mode[1] };
+				debug_menu_entry ultra_god_mode = { "Ultra God Mode ", BOOLEAN_E,  &god_mode[2] };
+
+				add_debug_menu_entry(options_menu, &god_mode_entry);
+				add_debug_menu_entry(options_menu, &mega_god_mode);
+				add_debug_menu_entry(options_menu, &ultra_god_mode);
+
+
+
 			}
 
 			
