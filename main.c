@@ -9,8 +9,6 @@
 #pragma comment(lib, "Dinput8.lib")
 #pragma comment(lib, "Dxguid.lib")
 
-
-
 void* g_game_ptr = NULL;
 void* g_world_ptr = 0x0095C770;
 
@@ -23,6 +21,13 @@ char* injected_pack = NULL;
 DWORD for_pack_loading[2];
 
 
+#undef IsEqualGUID
+BOOL WINAPI IsEqualGUID(
+	REFGUID rguid1,
+	REFGUID rguid2)
+{
+	return !memcmp(rguid1, rguid2, sizeof(GUID));
+}
 
 
 
@@ -449,6 +454,7 @@ void aeps_RenderAll() {
 
 int debug_enabled = 0;
 uint32_t keys[256];
+
 
 
 
@@ -902,139 +908,257 @@ char* district_variant_string_generator(debug_menu_entry* entry) {
 }
 
 
+
+
+typedef enum {
+	MENU_TOGGLE,
+	MENU_ACCEPT,
+	MENU_BACK,
+
+	MENU_UP,
+	MENU_DOWN,
+	MENU_LEFT,
+	MENU_RIGHT,
+
+
+	MENU_KEY_MAX
+}MenuKey;
+
+uint32_t controllerKeys[MENU_KEY_MAX];
+
+int get_menu_key_value(MenuKey key, int keyboard) {
+	if (keyboard) {
+
+		int i = 0;
+		switch (key) {
+			case MENU_TOGGLE:
+				i = DIK_INSERT;
+				break;
+			case MENU_ACCEPT:
+				i = DIK_RETURN;
+				break;
+			case MENU_BACK:
+				i = DIK_ESCAPE;
+				break;
+
+			case MENU_UP:
+				i = DIK_UPARROW;
+				break;
+			case MENU_DOWN:
+				i = DIK_DOWNARROW;
+				break;
+			case MENU_LEFT:
+				i = DIK_LEFTARROW;
+				break;
+			case MENU_RIGHT:
+				i = DIK_RIGHTARROW;
+				break;
+		}
+		return keys[i];
+	}
+
+
+
+	return controllerKeys[key];
+}
+
+
+int is_menu_key_pressed(MenuKey key, int keyboard) {
+	return (get_menu_key_value(key, keyboard) == 2);
+}
+
+int is_menu_key_clicked(MenuKey key, int keyboard) {
+	return get_menu_key_value(key, keyboard);
+}
+
+void GetDeviceStateHandleKeyboardInput(LPVOID lpvData) {
+	BYTE* keysCurrent = lpvData;
+
+	for (int i = 0; i < 256; i++) {
+
+		if (keysCurrent[i]) {
+			keys[i]++;
+		}
+		else {
+			keys[i] = 0;
+		}
+	}
+
+	
+}
+
+void read_and_update_controller_key_button(LPDIJOYSTATE2 joy, int index, MenuKey key) {
+	int res = 0;
+	if (joy->rgbButtons[index]) {
+		controllerKeys[key]++;
+	}
+	else {
+		controllerKeys[key] = 0;
+	}
+}
+
+
+void read_and_update_controller_key_dpad(LPDIJOYSTATE2 joy, int angle, MenuKey key) {
+	
+	if (joy->rgdwPOV[0] == 0xFFFFFFFF)
+		controllerKeys[key] = 0;
+	else
+		controllerKeys[key] = (joy->rgdwPOV[0] == angle) ? controllerKeys[key] + 1 : 0;
+}
+
+
+void GetDeviceStateHandleControllerInput(LPVOID lpvData) {
+	LPDIJOYSTATE2 joy = lpvData;
+
+	read_and_update_controller_key_button(joy, 1, MENU_ACCEPT);
+	read_and_update_controller_key_button(joy, 2, MENU_BACK);
+	read_and_update_controller_key_button(joy, 12, MENU_TOGGLE);
+
+
+
+	read_and_update_controller_key_dpad(joy, 0, MENU_UP);
+	read_and_update_controller_key_dpad(joy, 9000, MENU_RIGHT);
+	read_and_update_controller_key_dpad(joy, 18000, MENU_DOWN);
+	read_and_update_controller_key_dpad(joy, 27000, MENU_LEFT);
+
+}
+
+
+void menu_setup(int game_state, int keyboard) {
+
+	//debug menu stuff
+	if (is_menu_key_pressed(MENU_TOGGLE, keyboard) && (game_state == 6 || game_state == 7)) {
+
+
+		if (debug_enabled && game_state == 7) {
+			game_unpause(g_game_ptr);
+			debug_enabled = !debug_enabled;
+		}
+		else if (!debug_enabled && game_state == 6) {
+			game_pause(g_game_ptr);
+			debug_enabled = !debug_enabled;
+			current_menu = start_debug;
+		}
+
+		if (warp_menu->used_slots == 0) {
+
+			debug_menu_entry poi = { "--- WARP TO POI ---", NORMAL, NULL };
+			poi.data1 = 1;
+			add_debug_menu_entry(warp_menu, &poi);
+
+			for (int i = 0; i < *number_of_allocated_regions; i++) {
+				region* cur_region = &(*all_regions)[i];
+				char* region_name = region_get_name(cur_region);
+
+				debug_menu_entry warp_entry = { "", NORMAL, cur_region };
+				warp_entry.data1 = 0;
+				strcpy(warp_entry.text, region_name);
+				add_debug_menu_entry(warp_menu, &warp_entry);
+
+				if (cur_region->variants >= 2) {
+					warp_entry.entry_type = CUSTOM;
+					warp_entry.custom_string_generator = district_variant_string_generator;
+					add_debug_menu_entry(district_variants_menu, &warp_entry);
+				}
+			}
+			qsort(warp_menu->entries, *number_of_allocated_regions, sizeof(debug_menu_entry), sort_warp_entries);
+			qsort(district_variants_menu->entries, district_variants_menu->used_slots, sizeof(debug_menu_entry), sort_warp_entries);
+
+		}
+
+
+		if (options_menu->used_slots == 2) {
+			BYTE* arr = *(DWORD*)0x96858C;
+			debug_menu_entry render_fe = { "Render FE UI ", BOOLEAN_E,  &arr[4 + 0x90] };
+			add_debug_menu_entry(options_menu, &render_fe);
+
+
+			BYTE* flags = *(BYTE**)0x0096858C;
+			debug_menu_entry live_in_glass_house = { "Live in Glass House ", BOOLEAN_E,  &flags[4 + 0x7A] };
+			add_debug_menu_entry(options_menu, &live_in_glass_house);
+
+
+			BYTE* god_mode = 0x95A6A8;
+			debug_menu_entry god_mode_entry = { "God Mode ", BOOLEAN_E,  &god_mode[0] };
+			debug_menu_entry mega_god_mode = { "Mega God Mode ", BOOLEAN_E,  &god_mode[1] };
+			debug_menu_entry ultra_god_mode = { "Ultra God Mode ", BOOLEAN_E,  &god_mode[2] };
+
+			add_debug_menu_entry(options_menu, &god_mode_entry);
+			add_debug_menu_entry(options_menu, &mega_god_mode);
+			add_debug_menu_entry(options_menu, &ultra_god_mode);
+
+
+
+		}
+	}
+}
+
+void menu_input_handler(int keyboard, int SCROLL_SPEED) {
+	if (is_menu_key_clicked(MENU_DOWN, keyboard)) {
+
+
+		int key_val = get_menu_key_value(MENU_DOWN, keyboard);
+		if (key_val == 1) {
+			menu_go_down();
+		}
+		else if ((key_val >= SCROLL_SPEED) && (key_val % SCROLL_SPEED == 0)) {
+			menu_go_down();
+		}
+	}
+	else if (is_menu_key_clicked(MENU_UP, keyboard)) {
+
+		int key_val = get_menu_key_value(MENU_UP, keyboard);
+		if (key_val == 1) {
+			menu_go_up();
+		}
+		else if ((key_val >= SCROLL_SPEED) && (key_val % SCROLL_SPEED == 0)) {
+			menu_go_up();
+		}
+	}
+	else if (is_menu_key_pressed(MENU_ACCEPT, keyboard)) {
+		current_menu->handler(&current_menu->entries[current_menu->window_start + current_menu->cur_index], ENTER);
+	}
+	else if (is_menu_key_pressed(MENU_BACK, keyboard)) {
+		current_menu->go_back();
+	}
+	else if (is_menu_key_pressed(MENU_LEFT, keyboard) || is_menu_key_pressed(MENU_RIGHT, keyboard)) {
+
+		debug_menu_entry* cur = &current_menu->entries[current_menu->window_start + current_menu->cur_index];
+		if (cur->entry_type == BOOLEAN_E || cur->entry_type == CUSTOM)
+			current_menu->handler(cur, (is_menu_key_pressed(MENU_LEFT, keyboard) ? LEFT : RIGHT));
+	}
+}
+
 HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* this, DWORD cbData, LPVOID lpvData) {
 
 
 	HRESULT res = GetDeviceStateOriginal(this, cbData, lpvData);
 
 
+	//printf("cbData %d %d %d\n", cbData, sizeof(DIJOYSTATE), sizeof(DIJOYSTATE2));
+
+
+	
 	//keyboard time babyyy
-	if (cbData == 256) {
+	if (cbData == 256 || cbData == sizeof(DIJOYSTATE2)) {
 
-		BYTE* keysCurrent = lpvData;
-
-		for (int i = 0; i < 256; i++) {
-
-			if (keysCurrent[i]) {
-				keys[i]++;
-			}
-			else {
-				keys[i] = 0;
-			}
-		}
+		
+		if (cbData == 256)
+			GetDeviceStateHandleKeyboardInput(lpvData);
+		else if (cbData == sizeof(DIJOYSTATE2))
+			GetDeviceStateHandleControllerInput(lpvData);
 
 		int game_state = 0;
 		if (g_game_ptr)
 			game_state = game_get_cur_state(g_game_ptr);
 
+		//printf("INSERT %d %d %c\n", keys[DIK_INSERT], game_state, debug_enabled ? 'y' : 'n');
 
-		//debug menu stuff
-		if (keys[DIK_INSERT] == 2 && (game_state == 6 || game_state == 7)) {
-
-
-			if (debug_enabled && game_state == 7) {
-				game_unpause(g_game_ptr);
-				debug_enabled = !debug_enabled;
-			}
-			else if (!debug_enabled && game_state == 6) {
-				game_pause(g_game_ptr);
-				debug_enabled = !debug_enabled;
-				current_menu = start_debug;
-			}
-
-			if (warp_menu->used_slots == 0) {
-
-				debug_menu_entry poi = { "--- WARP TO POI ---", NORMAL, NULL };
-				poi.data1 = 1;
-				add_debug_menu_entry(warp_menu, &poi);
-
-				for (int i = 0; i < *number_of_allocated_regions; i++) {
-					region* cur_region = &(*all_regions)[i];
-					char* region_name = region_get_name(cur_region);
-
-					debug_menu_entry warp_entry = { "", NORMAL, cur_region };
-					warp_entry.data1 = 0;
-					strcpy(warp_entry.text, region_name);
-					add_debug_menu_entry(warp_menu, &warp_entry);	
-
-					if (cur_region->variants >= 2) {
-						warp_entry.entry_type = CUSTOM;
-						warp_entry.custom_string_generator = district_variant_string_generator;
-						add_debug_menu_entry(district_variants_menu, &warp_entry);
-					}
-}
-				qsort(warp_menu->entries, *number_of_allocated_regions, sizeof(debug_menu_entry), sort_warp_entries);
-				qsort(district_variants_menu->entries, district_variants_menu->used_slots, sizeof(debug_menu_entry), sort_warp_entries);
-
-			}
-
-			
-			if (options_menu->used_slots == 2) {
-				BYTE* arr = *(DWORD*)0x96858C;
-				debug_menu_entry render_fe = { "Render FE UI ", BOOLEAN_E,  &arr[4+0x90]};
-				add_debug_menu_entry(options_menu, &render_fe);
-
-
-				BYTE* flags = *(BYTE**)0x0096858C;
-				debug_menu_entry live_in_glass_house = { "Live in Glass House ", BOOLEAN_E,  &flags[4+0x7A]};
-				add_debug_menu_entry(options_menu, &live_in_glass_house);
-
-
-				BYTE* god_mode = 0x95A6A8;
-				debug_menu_entry god_mode_entry = { "God Mode ", BOOLEAN_E,  &god_mode[0] };
-				debug_menu_entry mega_god_mode = { "Mega God Mode ", BOOLEAN_E,  &god_mode[1] };
-				debug_menu_entry ultra_god_mode = { "Ultra God Mode ", BOOLEAN_E,  &god_mode[2] };
-
-				add_debug_menu_entry(options_menu, &god_mode_entry);
-				add_debug_menu_entry(options_menu, &mega_god_mode);
-				add_debug_menu_entry(options_menu, &ultra_god_mode);
-
-
-
-			}
-
-			
-
-		}
-
+		int keyboard = cbData == 256;
+		menu_setup(game_state, keyboard);
 
 		if (debug_enabled) {
-
-
-
-#define SCROLL_SPEED 4
-			if (keys[DIK_DOWNARROW]) {
-
-				if (keys[DIK_DOWNARROW] == 1) {
-					menu_go_down();
-				}
-				else if (keys[DIK_DOWNARROW] >= SCROLL_SPEED && keys[DIK_DOWNARROW] % SCROLL_SPEED == 0) {
-					menu_go_down();
-				}
-			}
-			else if (keys[DIK_UPARROW]) {
-
-				if (keys[DIK_UPARROW] == 1) {
-					menu_go_up();
-				}
-				else if (keys[DIK_UPARROW] >= SCROLL_SPEED && keys[DIK_UPARROW] % SCROLL_SPEED == 0) {
-					menu_go_up();
-				}
-			}
-			else if (keys[DIK_RETURN] == 2) {
-				current_menu->handler(&current_menu->entries[current_menu->window_start + current_menu->cur_index], ENTER);
-			}
-			else if (keys[DIK_ESCAPE] == 2) {
-				current_menu->go_back();
-			}
-			else if (keys[DIK_LEFTARROW] == 2 || keys[DIK_RIGHTARROW] == 2) {
-
-				debug_menu_entry* cur = &current_menu->entries[current_menu->window_start + current_menu->cur_index];
-				if(cur->entry_type == BOOLEAN_E || cur->entry_type == CUSTOM)
-					current_menu->handler(cur, (keys[DIK_LEFTARROW] == 2 ? LEFT : RIGHT));
-			}
-
-
+			menu_input_handler(keyboard, 5);
 		}
 
 	}
@@ -1058,7 +1182,7 @@ HRESULT __stdcall GetDeviceDataHook(IDirectInputDevice8* this, DWORD cbObjectDat
 
 	HRESULT res = GetDeviceDataOriginal(this, cbObjectData, rgdod, pdwInOut, dwFlags);
 
-
+	printf("data\n");
 	if (res == DI_OK) {
 
 		printf("All gud\n");
@@ -1088,9 +1212,21 @@ IDirectInput8CreateDevice_ptr createDeviceOriginal = NULL;
 HRESULT  __stdcall IDirectInput8CreateDeviceHook(IDirectInput8W* this, const GUID* guid, LPDIRECTINPUTDEVICE8W* device, LPUNKNOWN unk) {
 
 	//printf("CreateDevice %d %d %d %d %d %d %d\n", *guid, GUID_SysMouse, GUID_SysKeyboard, GUID_SysKeyboardEm, GUID_SysKeyboardEm2, GUID_SysMouseEm, GUID_SysMouseEm2);
-
+	printf("Guid = {%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX}\n",
+		guid->Data1, guid->Data2, guid->Data3,
+		guid->Data4[0], guid->Data4[1], guid->Data4[2], guid->Data4[3],
+		guid->Data4[4], guid->Data4[5], guid->Data4[6], guid->Data4[7]);
 
 	HRESULT res = createDeviceOriginal(this, guid, device, unk);
+
+
+	if (IsEqualGUID(&GUID_SysMouse, guid))
+		return res; // ignore mouse
+
+	if (IsEqualGUID(&GUID_SysKeyboard, guid))
+		puts("Found the keyboard");
+	else
+		puts("Hooking something different...maybe a controller");
 
 	DWORD* vtbl = (*device)->lpVtbl;
 	if (!GetDeviceStateOriginal) {
