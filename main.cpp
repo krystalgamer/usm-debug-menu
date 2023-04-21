@@ -1,3 +1,7 @@
+#ifdef _WIN32
+#define _USE_MATH_DEFINES
+#endif
+
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
 #include <stdio.h>
@@ -15,11 +19,10 @@
 void* g_game_ptr = nullptr;
 void* g_world_ptr = (void *) 0x0095C770;
 
-DWORD* ai_current_player = NULL;
-DWORD* fancy_player_ptr = NULL;
+DWORD* ai_current_player = nullptr;
+DWORD* fancy_player_ptr = nullptr;
 
-char* injected_pack = NULL;
-
+char* injected_pack = nullptr;
 
 DWORD for_pack_loading[2];
 
@@ -112,34 +115,39 @@ typedef struct {
 	uint8_t unk3[0x4];
 	uint8_t variants;
 	uint8_t unk4[0x6B];
-}region;
-
+} region;
 
 typedef enum {
 	NORMAL,
 	BOOLEAN_E,
 	CUSTOM
-}debug_menu_entry_type;
-
+} debug_menu_entry_type;
 
 typedef enum {
 	LEFT,
 	RIGHT,
 	ENTER
-}custom_key_type;
+} custom_key_type;
 
+struct debug_menu_entry;
+typedef char* (*custom_string_generator_ptr)(debug_menu_entry* entry);
 
-struct _debug_menu_entry;
-typedef char* (*custom_string_generator_ptr)(struct _debug_menu_entry* entry);
-
-typedef struct _debug_menu_entry {
+struct debug_menu_entry {
 
 	char text[MAX_CHARS];
 	debug_menu_entry_type entry_type;
 	void* data;
 	void* data1;
 	custom_string_generator_ptr custom_string_generator;
-}debug_menu_entry;
+
+    debug_menu_entry() = default;
+
+    debug_menu_entry(const char *p_text, debug_menu_entry_type p_type, void *p_data) :
+        entry_type(p_type), data(p_data)
+    {
+        strncpy(this->text, p_text, MAX_CHARS_SAFE);
+    }
+};
 
 typedef void (*menu_handler_function)(debug_menu_entry*, custom_key_type key_type);
 typedef void (*go_back_function)();
@@ -153,19 +161,16 @@ typedef struct {
 	go_back_function go_back;
 	menu_handler_function handler;
 	debug_menu_entry* entries;
-}debug_menu;
+} debug_menu;
 
-
-
-debug_menu* start_debug = NULL;
-debug_menu* warp_menu = NULL;
+debug_menu* start_debug = nullptr;
+debug_menu* warp_menu = nullptr;
 debug_menu* missions_menu = nullptr;
-debug_menu* district_variants_menu = NULL;
-debug_menu* char_select_menu = NULL;
-debug_menu* options_menu = NULL;
-debug_menu* script_menu = NULL;
-debug_menu* progression_menu = NULL;
-
+debug_menu* district_variants_menu = nullptr;
+debug_menu* char_select_menu = nullptr;
+debug_menu* options_menu = nullptr;
+debug_menu* script_menu = nullptr;
+debug_menu* progression_menu = nullptr;
 
 debug_menu** all_menus[] = {
 	&start_debug,
@@ -178,7 +183,7 @@ debug_menu** all_menus[] = {
 	&progression_menu
 };
 
-debug_menu* current_menu = NULL;
+debug_menu* current_menu = nullptr;
 
 void goto_start_debug() {
 	current_menu = start_debug;
@@ -192,7 +197,7 @@ void unlock_region(region* cur_region) {
 void remove_debug_menu_entry(debug_menu_entry* entry) {
 	
 	DWORD to_be = (DWORD)entry;
-	for (int i = 0; i < (sizeof(all_menus) / sizeof(void*)); i++) {
+	for (auto i = 0u; i < (sizeof(all_menus) / sizeof(void*)); ++i) {
 
 		debug_menu *cur = *all_menus[i];
 
@@ -229,7 +234,7 @@ void* add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 
 		void* new_ptr = realloc(menu->entries, current_entries_size + new_entries_size);
 
-		if (new_ptr == NULL) {
+		if (new_ptr == nullptr) {
 			printf("RIP\n");
 			__debugbreak();
 		}
@@ -299,10 +304,10 @@ int construct_client_script_libs_hook() {
 	return construct_client_script_libs();
 }
 
-typedef (__fastcall* mString_constructor_ptr)(mString* , void* edx, const char* str);
+typedef int (__fastcall* mString_constructor_ptr)(mString* , void* edx, const char* str);
 mString_constructor_ptr mString_constructor = (mString_constructor_ptr) 0x00421100;
 
-typedef (__fastcall* mString_finalize_ptr)(mString* , void* edx, int zero);
+typedef int (__fastcall* mString_finalize_ptr)(mString* , void* edx, int zero);
 mString_finalize_ptr mString_finalize = (mString_finalize_ptr) 0x004209C0;
 
 region** all_regions = (region **) 0x0095C924;
@@ -605,26 +610,26 @@ int WindowHandler(HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 
 */
 
-typedef int(__stdcall* GetDeviceState_ptr)(IDirectInputDevice8*, DWORD, LPVOID);
+typedef int (__stdcall* GetDeviceState_ptr)(IDirectInputDevice8*, DWORD, LPVOID);
 GetDeviceState_ptr GetDeviceStateOriginal = nullptr;
 
-typedef (__fastcall* game_pause_unpause_ptr)(void* );
+typedef int (__fastcall* game_pause_unpause_ptr)(void* );
 game_pause_unpause_ptr game_pause = (game_pause_unpause_ptr) 0x0054FBE0;
 game_pause_unpause_ptr game_unpause = (game_pause_unpause_ptr) 0x0053A880;
 
-typedef (__fastcall* game_get_cur_state_ptr)(void* );
+typedef int (__fastcall* game_get_cur_state_ptr)(void* );
 game_get_cur_state_ptr game_get_cur_state = (game_get_cur_state_ptr) 0x005363D0;
 
-typedef (__fastcall* world_dynamics_system_remove_player_ptr)(void* , void* edx, int number);
+typedef int (__fastcall* world_dynamics_system_remove_player_ptr)(void* , void* edx, int number);
 world_dynamics_system_remove_player_ptr world_dynamics_system_remove_player = (world_dynamics_system_remove_player_ptr) 0x00558550;
 
-typedef (__fastcall* world_dynamics_system_add_player_ptr)(void* , void* edx, mString* str);
+typedef int (__fastcall* world_dynamics_system_add_player_ptr)(void* , void* edx, mString* str);
 world_dynamics_system_add_player_ptr world_dynamics_system_add_player = (world_dynamics_system_add_player_ptr) 0x0055B400;
 
 DWORD changing_model = 0;
 const char* current_costume = "ultimate_spiderman";
 
-typedef (*entity_teleport_abs_po_ptr)(DWORD, float*, int one);
+typedef int (*entity_teleport_abs_po_ptr)(DWORD, float*, int one);
 entity_teleport_abs_po_ptr entity_teleport_abs_po = (entity_teleport_abs_po_ptr) 0x004F3890;
 
 typedef DWORD* (__fastcall* ai_ai_core_get_info_node_ptr)(DWORD* , void* edx, int a2, char a3);
@@ -967,7 +972,7 @@ void setup_warp_menu()
 {
     if (warp_menu->used_slots == 0) {
 
-		debug_menu_entry poi = { "--- WARP TO POI ---", NORMAL, NULL };
+		debug_menu_entry poi = { "--- WARP TO POI ---", NORMAL, nullptr};
 		poi.data1 = (void *) 1;
 		add_debug_menu_entry(warp_menu, &poi);
 
@@ -1280,7 +1285,7 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* self, DWORD cbData, LP
 }
 
 typedef HRESULT(__stdcall* GetDeviceData_ptr)(IDirectInputDevice8*, DWORD, LPDIDEVICEOBJECTDATA, LPDWORD, DWORD);
-GetDeviceData_ptr GetDeviceDataOriginal = NULL;
+GetDeviceData_ptr GetDeviceDataOriginal = nullptr;
 
 HRESULT __stdcall GetDeviceDataHook(IDirectInputDevice8* self, DWORD cbObjectData, LPDIDEVICEOBJECTDATA rgdod, LPDWORD pdwInOut, DWORD dwFlags) {
 
@@ -1311,7 +1316,7 @@ HRESULT __stdcall GetDeviceDataHook(IDirectInputDevice8* self, DWORD cbObjectDat
 
 
 typedef HRESULT(__stdcall* IDirectInput8CreateDevice_ptr)(IDirectInput8W*, const GUID*, LPDIRECTINPUTDEVICE8W*, LPUNKNOWN);
-IDirectInput8CreateDevice_ptr createDeviceOriginal = NULL;
+IDirectInput8CreateDevice_ptr createDeviceOriginal = nullptr;
 
 HRESULT  __stdcall IDirectInput8CreateDeviceHook(IDirectInput8W* self, const GUID* guid, LPDIRECTINPUTDEVICE8W* device, LPUNKNOWN unk) {
 
@@ -1344,12 +1349,12 @@ HRESULT  __stdcall IDirectInput8CreateDeviceHook(IDirectInput8W* self, const GUI
 		vtbl[10] = GetDeviceDataHook;
 	}
 #else
-    if (GetDeviceStateOriginal == NULL) {
+    if (GetDeviceStateOriginal == nullptr) {
         GetDeviceStateOriginal = (GetDeviceState_ptr)
             HookVTableFunction((void *) *device, (void *) GetDeviceStateHook, 9);
     }
 
-    if (GetDeviceDataOriginal == NULL) {
+    if (GetDeviceDataOriginal == nullptr) {
         GetDeviceDataOriginal = (GetDeviceData_ptr) HookVTableFunction((void *) *device,
                                                                        (void *) GetDeviceDataHook,
                                                                        10);
@@ -1360,7 +1365,7 @@ HRESULT  __stdcall IDirectInput8CreateDeviceHook(IDirectInput8W* self, const GUI
 }
 
 typedef HRESULT(__stdcall* IDirectInput8Release_ptr)(IDirectInput8W*);
-IDirectInput8Release_ptr releaseDeviceOriginal = NULL;
+IDirectInput8Release_ptr releaseDeviceOriginal = nullptr;
 
 HRESULT  __stdcall IDirectInput8ReleaseHook(IDirectInput8W* self) {
 
@@ -1395,7 +1400,7 @@ HRESULT __stdcall HookDirectInput8Create(HINSTANCE hinst, DWORD dwVersion, REFII
 		vtbl[3] = IDirectInput8CreateDeviceHook;
 	}
 #else
-    if (createDeviceOriginal == NULL) {
+    if (createDeviceOriginal == nullptr) {
         createDeviceOriginal = (IDirectInput8CreateDevice_ptr)
             HookVTableFunction((void *) iDir, (void *) IDirectInput8CreateDeviceHook, 3);
     }
@@ -1607,7 +1612,7 @@ void handle_warp_entry(debug_menu_entry* entry) {
 		unlock_region(cur_region);
 	}
 	else {
-		int res = entity_tracker_manager_get_the_arrow_target_pos( *(*(DWORD***)0x937B18 + 21), NULL, final_pos);
+		int res = entity_tracker_manager_get_the_arrow_target_pos( *(*(DWORD***)0x937B18 + 21), nullptr, final_pos);
 		if (!res)
 			return;
 	}
@@ -1626,7 +1631,7 @@ void handle_char_select_entry(debug_menu_entry* entry) {
 
 	while (*some_number) {
 		//printf("some_number %d\n", *some_number);
-		world_dynamics_system_remove_player((void *) *(DWORD*)g_world_ptr, NULL, *some_number - 1);
+		world_dynamics_system_remove_player((void *) *(DWORD*)g_world_ptr, nullptr, *some_number - 1);
 	}
 
 	debug_enabled = 0;
@@ -1670,10 +1675,10 @@ void handle_distriction_variants_select_entry(debug_menu_entry* entry, custom_ke
 	switch (key_type) {
 
 	case LEFT:
-		terrain_set_district_variant(terrain_ptr, NULL, district_id, modulo(current_variant-1, variants), 1);
+		terrain_set_district_variant(terrain_ptr, nullptr, district_id, modulo(current_variant-1, variants), 1);
 		break;
 	case RIGHT:
-		terrain_set_district_variant(terrain_ptr, NULL, district_id, modulo(current_variant+1, variants), 1);
+		terrain_set_district_variant(terrain_ptr, nullptr, district_id, modulo(current_variant+1, variants), 1);
 		break;
 	default:
 		return;
@@ -1721,7 +1726,7 @@ void setup_debug_menu() {
 	};
 
 
-	for (int i = 0; i < sizeof(costumes) / sizeof(char*); i++) {
+	for (auto i = 0u; i < sizeof(costumes) / sizeof(char*); ++i) {
 		debug_menu_entry char_entry;
 		char_entry.entry_type = NORMAL;
 		strcpy(char_entry.text, costumes[i]);
