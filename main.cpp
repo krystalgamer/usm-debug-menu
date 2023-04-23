@@ -1007,7 +1007,7 @@ void close_debug();
 
 struct mission_t
 {
-    mString field_0;
+    std::string field_0;
     const char *field_C;
     int field_10;
     int field_14;
