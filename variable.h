@@ -1,9 +1,5 @@
 #pragma once
 
-#include <cassert>
-#include <cstdio>
-#include <cxxabi.h>
-
 template<typename T>
 struct Var {
     using value_type = T;
