@@ -22,7 +22,64 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="actor.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ai_player_controller.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="bit.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="color.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="common.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="fixedstring32.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="forwards.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="func_wrapper.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="mashable_vector.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="mission_manager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="mission_manager_script_data.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="mission_table_container.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="mstring.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="region.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="region_mash_info.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource_key.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource_manager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="utility.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="variable.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="wds.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
