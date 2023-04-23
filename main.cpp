@@ -469,23 +469,24 @@ int getStringHeight(const char* str) {
 	return height;
 }
 
-char* getRealText(debug_menu_entry* entry, char* str) {
+std::string getRealText(debug_menu_entry* entry) {
 
 	if (entry->entry_type == BOOLEAN_E) {
 		BYTE* val = static_cast<decltype(val)>(entry->data);
+
+        char str[100]; 
 		sprintf(str, "%s: %s", entry->text, *val ? "True" : "False");
-		return str;
+		return {str};
 	}
 
 	if (entry->entry_type == CUSTOM) {
 		return entry->custom_string_generator(entry);
 	}
 
-	return entry->text;
+	return {entry->text};
 }
 
 void render_current_debug_menu() {
-	char text_buffer[128];
     auto UP_ARROW {" ^ ^ ^ "};
     auto DOWN_ARROW {" v v v "};
 
@@ -498,11 +499,12 @@ void render_current_debug_menu() {
 	int debug_width = 0;
 	int debug_height = 0;
 
-#define get_and_update(x) {\
-	 getStringDimensions(x, &cur_width, &cur_height); \
-	 debug_height += cur_height; \
-	 debug_width = std::max(debug_width, cur_width);\
-	}
+    auto get_and_update = [&](auto *x) {\
+        getStringDimensions(x, &cur_width, &cur_height); \
+        debug_height += cur_height; \
+        debug_width = std::max(debug_width, cur_width);\
+	};
+
 	//printf("new size: %s %d %d (%d %d)\n", x, debug_width, debug_height, cur_width, cur_height); \
 
 
@@ -514,8 +516,8 @@ void render_current_debug_menu() {
 	for (int i = 0; i < total_elements_page; i++) {
 
 		debug_menu_entry *entry = &current_menu->entries[current_menu->window_start + i];
-		char* cur = getRealText(entry, text_buffer);
-		get_and_update(cur);
+		auto cur = getRealText(entry);
+		get_and_update(cur.c_str());
 	}
 
 
@@ -553,18 +555,17 @@ void render_current_debug_menu() {
 	if (current_menu->window_start) {
 		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, pink_color, 1.f, 1.f, UP_ARROW);
 	}
+
 	render_height += getStringHeight(UP_ARROW);
-
-
 
 	for (int i = 0; i < total_elements_page; i++) {
 
 		int current_color = current_menu->cur_index == i ? yellow_color : white_color;
 
 		debug_menu_entry* entry = &current_menu->entries[current_menu->window_start + i];
-		char* cur = getRealText(entry, text_buffer);
-		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, current_color, 1.f, 1.f, cur);
-		render_height += getStringHeight(cur);
+		auto cur = getRealText(entry);
+		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, current_color, 1.f, 1.f, cur.c_str());
+		render_height += getStringHeight(cur.c_str());
 	}
 
 	if (needs_down_arrow) {
@@ -1748,14 +1749,12 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID reserverd) {
 
 	memset(keys, 0, sizeof(keys));
 	if (fdwReason == DLL_PROCESS_ATTACH) {
-		/*
 		AllocConsole();
 
 		if (!freopen("CONOUT$", "w", stdout)) {
 			MessageBoxA(NULL, "Error", "Couldn't allocate console...Closing", 0);
 			return FALSE;
 		}
-		*/
 
 		setup_debug_menu();
 		set_text_writeable();
