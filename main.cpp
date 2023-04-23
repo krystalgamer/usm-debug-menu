@@ -2,13 +2,14 @@
 #define _USE_MATH_DEFINES
 #endif
 
+#include <cmath>
+
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
 #include <stdio.h>
-#include "forwards.h"
 #include <dinput.h>
-
-#include <cmath>
+#include <vector>
+#include <string>
 
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
@@ -16,8 +17,17 @@
 #pragma comment(lib, "Dinput8.lib")
 #pragma comment(lib, "Dxguid.lib")
 
+#include "resource_manager.h"
+#include "forwards.h"
+#include "variable.h"
+#include "func_wrapper.h"
+#include "fixedstring32.h"
+#include "mission_manager.h"
+#include "mission_table_container.h"
+#include "mstring.h"
+#include "region.h"
+
 void* g_game_ptr = nullptr;
-void* g_world_ptr = (void *) 0x0095C770;
 
 DWORD* ai_current_player = nullptr;
 DWORD* fancy_player_ptr = nullptr;
@@ -62,6 +72,8 @@ uint8_t color_ramp_function(float ratio, int period_duration, int cur_time) {
 		return std::min(calc, 1.0f) * 255;
 	}
 
+    return 0;
+
 }
 
 static void *HookVTableFunction(void *pVTable, void *fnHookFunc, int nOffset) {
@@ -93,29 +105,11 @@ typedef struct _list{
 	void* data;
 }list;
 
-typedef struct {
-	BYTE unk[256];//not sure how big
-}mString;
-
 #define MAX_CHARS_SAFE 63
 #define MAX_CHARS MAX_CHARS_SAFE+1
 #define EXTEND_NEW_ENTRIES 20
 static constexpr DWORD MAX_ELEMENTS_PAGE = 18;
 
-#pragma pack(1)
-typedef struct {
-	uint8_t unk[0x50];
-	uint8_t status;
-	uint8_t unk1[0x53];
-	float x;
-	float y;
-	float z;
-	uint8_t unk2[0x10];
-	DWORD district_id;
-	uint8_t unk3[0x4];
-	uint8_t variants;
-	uint8_t unk4[0x6B];
-} region;
 
 typedef enum {
 	NORMAL,
@@ -998,91 +992,47 @@ void setup_warp_menu()
 	}
 }
 
-typedef struct {
-    mString field_0;
-    const char *field_C;
-    int field_10;
-    int field_14;
-} mission_t;
-
-typedef struct {
-    int field_0;
-    mission_t *m_first;
-    mission_t *m_last;
-    mission_t *m_end;
-} vector__mission_t;
-
-vector__mission_t menu_missions;
-
 typedef int (*resource_manager_can_reload_amalgapak_ptr)(void);
 resource_manager_can_reload_amalgapak_ptr resource_manager_can_reload_amalgapak = (resource_manager_can_reload_amalgapak_ptr) 0x0053DE90;
 
 typedef void (*resource_manager_reload_amalgapak_ptr)(void);
 resource_manager_reload_amalgapak_ptr resource_manager_reload_amalgapak = (resource_manager_reload_amalgapak_ptr) 0x0054C2E0;
 
-typedef struct {
-    char field_0[0x38];
-    int field_38;
-} mission_table_container;
 
-/*
-bool mission_table_container::append_script_info(_std::vector<mission_table_container::script_info> *info)
+struct mission_t
 {
-    assert(info != nullptr);
+    mString field_0;
+    const char *field_C;
+    int field_10;
+    int field_14;
+};
 
-    bool v9 = false;
-    for ( auto &v6 : this->field_38 )
-    {
-        if ( v6.applies_to_current_hero() )
-        {
-            auto v5 = v6.instances.size();
-            for ( auto i = 0u; i < v5; ++i )
-            {
-                script_info v3;
-                v3.field_0 = v6.field_18;
-                v3.field_4 = &v6.instances.at(i);
-                v3.field_8 = i;
-                info->push_back(v3);
-                v9 = true;
-            }
-        }
-    }
-
-    return v9;
-}
-*/
-
-typedef struct {
-    char field_0[0x38];
-    int m_district_table_count;
-} mission_manager;
-
-mission_manager **mission_manager__s_inst = (mission_manager **) 0x00968518;
+std::vector<mission_t> menu_missions; 
 
 void populate_missions_menu()
 {
-    /*
-    if (missions_menu->used_slots == 0) {
-        //menu_missions = {};
+    if (missions_menu->used_slots == 0)
+    {
+        menu_missions = {};
         if ( resource_manager_can_reload_amalgapak() )
         {
             resource_manager_reload_amalgapak();
         }
 
-        auto *head_menu = create_menu(entry->get_script_handler(), debug_menu::sort_mode_t::ascending);
-        entry->set_submenu(head_menu);
+        auto *head_menu = missions_menu;
 
-        auto *mission_unload_entry = create_menu_entry(mString{"UNLOAD CURRENT MISSION"});
+        debug_menu_entry mission_unload_entry {"UNLOAD CURRENT MISSION", NORMAL, nullptr};
+        mission_unload_entry.data1 = nullptr;
 
-        add_debug_menu_entry(missions_menu, missions_unload_entry);
+        add_debug_menu_entry(head_menu, &mission_unload_entry);
 
-        mission_manager *v2 = (*mission_manager__s_inst);
+        mission_manager *v2 = mission_manager::s_inst();
         int v58 = v2->m_district_table_count;
         for ( int i = -1; i < v58; ++i )
         {
             fixedstring32 v53{};
             int v52;
-            mission_table_container *table = NULL;
+            mission_table_container *table = nullptr;
             if ( i == -1 )
             {
                 table = v2->m_global_table_container;
@@ -1099,27 +1049,27 @@ void populate_missions_menu()
 
                 auto v52 = reg->get_district_id();
 
-                auto *v25 = create_menu(v53.to_string(), debug_menu::sort_mode_t::ascending);
+                auto *v25 = create_menu(v53.to_string(), nullptr, nullptr, 10);
 
-                auto *v26 = create_menu_entry(v25);
+                debug_menu_entry v26 {v53.to_string(), NORMAL, v25};
 
-                head_menu->add_entry(v26);
+                add_debug_menu_entry(head_menu, &v26);
             }
 
-            _std::vector<mission_table_container::script_info> script_infos;
+            std::vector<mission_table_container::script_info> script_infos;
 
             if ( table != nullptr )
             {
-                mission_table_container_append_script_info(table, &script_infos);
+                table->append_script_info(&script_infos);
             }
 
             for ( auto &info : script_infos)
             {
                 auto v50 = menu_missions.size();
-                mString a2{"pk_"};
+                std::string a2{"pk_"};
                 auto v19 = a2 + info.field_0;
                 auto *v11 = v19.c_str();
-                auto key = create_resource_key_from_path(v11, RESOURCE_KEY_TYPE_PACK);
+                auto key = create_resource_key_from_path(v11, 25);
                 if ( resource_manager::get_pack_file_stats(key, nullptr, nullptr, nullptr) )
                 {
                     mission_t mission{};
@@ -1130,35 +1080,38 @@ void populate_missions_menu()
                     mission.field_C = info.field_4->get_script_data_name();
                     menu_missions.push_back(mission);
 
-                    mString v47{};
+                    std::string v47{};
+
+                    char buff[1024];
                     if ( mission.field_C != nullptr )
                     {
                         auto *v17 = mission.field_C;
                         auto *v14 = mission.field_0.c_str();
-                        auto a2a = mString{0, "%s (%s)", v14, v17};
-                        v47 = a2a;
+
+                        snprintf(buff, sizeof(buff), "%s (%s)", v14, v17);
+                        v47 = buff;
                     }
                     else
                     {
                         auto v18 = mission.field_14;
                         auto *v15 = mission.field_0.c_str();
-                        auto a2b = mString{0, "%s (%d)", v15, v18};
-                        v47 = a2b;
+
+                        snprintf(buff, sizeof(buff), "%s (%d)", v15, v18);
+                        v47 = buff;
                     }
 
-                    auto *v27 = create_menu_entry(v47);
+                    debug_menu_entry v27 {v47.c_str(), NORMAL, nullptr};
 
-                    auto *v43 = v27;
-                    auto *v46 = v27;
-                    v27->set_id(v50);
-                    v46->set_game_flags_handler(mission_select_handler);
-                    head_menu->add_entry(v46);
+                    //v27->set_id(v50);
+                    v27.data1 = (void *) v50;
+
+                    //v46->set_game_flags_handler(mission_select_handler);
+                    add_debug_menu_entry(head_menu, &v27);
                 }
             }
         }
     
 	}
-    */
 }
 
 void menu_setup(int game_state, int keyboard) {
@@ -1438,7 +1391,7 @@ int __fastcall game_handle_game_states(void* self, void* edx, void* a2) {
 		if (!changing_model) {
 			mString str;
 			mString_constructor(&str, nullptr, current_costume);
-			world_dynamics_system_add_player((void *) *(DWORD*)g_world_ptr, nullptr, &str);
+			world_dynamics_system_add_player(g_world_ptr(), nullptr, &str);
 			mString_finalize(&str, nullptr, 0);
 			game_unpause(g_game_ptr);
 		}
@@ -1584,7 +1537,33 @@ void handle_debug_entry(debug_menu_entry* entry) {
 typedef char (__fastcall *entity_tracker_manager_get_the_arrow_target_pos_ptr)(DWORD* , void* edx, float* a2);
 entity_tracker_manager_get_the_arrow_target_pos_ptr entity_tracker_manager_get_the_arrow_target_pos = (entity_tracker_manager_get_the_arrow_target_pos_ptr) 0x0062EE10;
 
-void handle_missions_entry(debug_menu_entry* entry) {
+void mission_unload_handler(debug_menu_entry *a1)
+{
+    auto *v1 = mission_manager::s_inst();
+    v1->prepare_unload_script();
+
+	close_debug();
+}
+
+void handle_missions_entry(debug_menu_entry* entry)
+{
+    auto v1 = (int) entry->data1;
+    if (v1 == 0)
+    {
+        mission_unload_handler(entry); 
+    }
+    else
+    {
+        auto v7 = &menu_missions.at(v1);
+        auto v6 = v7->field_C;
+        auto v5 = v7->field_14;
+        auto *v4 = v7->field_0.c_str();
+        auto v3 = v7->field_10;
+        auto *v2 = mission_manager::s_inst();
+        v2->force_mission(v3, v4, v5, v6);
+    }
+
+	close_debug();
 }
 
 void handle_warp_entry(debug_menu_entry* entry) {
@@ -1627,11 +1606,11 @@ void handle_warp_entry(debug_menu_entry* entry) {
 
 void handle_char_select_entry(debug_menu_entry* entry) {
 
-	DWORD* some_number = (*(DWORD**)g_world_ptr) + 142;
+	DWORD some_number = g_world_ptr()->num_players;
 
-	while (*some_number) {
+	while (some_number) {
 		//printf("some_number %d\n", *some_number);
-		world_dynamics_system_remove_player((void *) *(DWORD*)g_world_ptr, nullptr, *some_number - 1);
+		world_dynamics_system_remove_player(g_world_ptr(), nullptr, some_number - 1);
 	}
 
 	debug_enabled = 0;
@@ -1667,7 +1646,7 @@ void handle_script_select_entry(debug_menu_entry* entry) {
 void handle_distriction_variants_select_entry(debug_menu_entry* entry, custom_key_type key_type) {
 
 	region* reg = static_cast<region *>(entry->data);
-	void* terrain_ptr = *(*(DWORD***)g_world_ptr + 0x6B);
+	void* terrain_ptr = g_world_ptr()->the_terrain;
 	int variants = reg->variants;
 	int current_variant = region_get_district_variant(reg);
 	DWORD district_id = reg->district_id;
