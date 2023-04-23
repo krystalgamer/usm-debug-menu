@@ -133,6 +133,12 @@ struct debug_menu_entry {
 	void* data;
 	void* data1;
 	custom_string_generator_ptr custom_string_generator;
+    void (*m_game_flags_handler)(debug_menu_entry *);
+
+    void set_game_flags_handler(void (*a2)(debug_menu_entry *))
+    {
+        this->m_game_flags_handler = a2;
+    }
 
     debug_menu_entry() = default;
 
@@ -998,6 +1004,7 @@ resource_manager_can_reload_amalgapak_ptr resource_manager_can_reload_amalgapak 
 typedef void (*resource_manager_reload_amalgapak_ptr)(void);
 resource_manager_reload_amalgapak_ptr resource_manager_reload_amalgapak = (resource_manager_reload_amalgapak_ptr) 0x0054C2E0;
 
+void close_debug();
 
 struct mission_t
 {
@@ -1008,6 +1015,26 @@ struct mission_t
 };
 
 std::vector<mission_t> menu_missions; 
+
+void mission_unload_handler(debug_menu_entry *a1)
+{
+    auto *v1 = mission_manager::s_inst();
+    v1->prepare_unload_script();
+
+	close_debug();
+}
+
+void mission_select_handler(debug_menu_entry *entry)
+{
+    auto v1 = (int) entry->data1;
+    auto v7 = &menu_missions.at(v1);
+    auto v6 = v7->field_C;
+    auto v5 = v7->field_14;
+    auto *v4 = v7->field_0.c_str();
+    auto v3 = v7->field_10;
+    auto *v2 = mission_manager::s_inst();
+    v2->force_mission(v3, v4, v5, v6);
+}
 
 void populate_missions_menu()
 {
@@ -1022,8 +1049,8 @@ void populate_missions_menu()
         auto *head_menu = missions_menu;
 
         debug_menu_entry mission_unload_entry {"UNLOAD CURRENT MISSION", NORMAL, nullptr};
-        mission_unload_entry.data1 = nullptr;
 
+        mission_unload_entry.set_game_flags_handler(mission_unload_handler);
         add_debug_menu_entry(head_menu, &mission_unload_entry);
 
         mission_manager *v2 = mission_manager::s_inst();
@@ -1105,7 +1132,7 @@ void populate_missions_menu()
                     //v27->set_id(v50);
                     v27.data1 = (void *) v50;
 
-                    //v46->set_game_flags_handler(mission_select_handler);
+                    v27.set_game_flags_handler(mission_select_handler);
                     add_debug_menu_entry(head_menu, &v27);
                 }
             }
@@ -1537,30 +1564,12 @@ void handle_debug_entry(debug_menu_entry* entry) {
 typedef char (__fastcall *entity_tracker_manager_get_the_arrow_target_pos_ptr)(DWORD* , void* edx, float* a2);
 entity_tracker_manager_get_the_arrow_target_pos_ptr entity_tracker_manager_get_the_arrow_target_pos = (entity_tracker_manager_get_the_arrow_target_pos_ptr) 0x0062EE10;
 
-void mission_unload_handler(debug_menu_entry *a1)
-{
-    auto *v1 = mission_manager::s_inst();
-    v1->prepare_unload_script();
-
-	close_debug();
-}
 
 void handle_missions_entry(debug_menu_entry* entry)
 {
-    auto v1 = (int) entry->data1;
-    if (v1 == 0)
+    if (entry->m_game_flags_handler != nullptr)
     {
-        mission_unload_handler(entry); 
-    }
-    else
-    {
-        auto v7 = &menu_missions.at(v1);
-        auto v6 = v7->field_C;
-        auto v5 = v7->field_14;
-        auto *v4 = v7->field_0.c_str();
-        auto v3 = v7->field_10;
-        auto *v2 = mission_manager::s_inst();
-        v2->force_mission(v3, v4, v5, v6);
+        entry->m_game_flags_handler(entry);
     }
 
 	close_debug();
