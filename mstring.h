@@ -16,7 +16,8 @@ struct mString
 
     mString &operator=(const char *a2)
     {
-        THISCALL(0x0041FE30, this, a2);
+        fastcall_call func = bit_cast<fastcall_call>(0x0041FE30);
+        func(this, 0, a2);
         return (*this);
     }
 };
