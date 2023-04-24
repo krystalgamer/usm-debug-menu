@@ -1615,11 +1615,11 @@ void handle_warp_entry(debug_menu_entry* entry) {
 
 void handle_char_select_entry(debug_menu_entry* entry) {
 
-	DWORD some_number = g_world_ptr()->num_players;
+	auto num_players = g_world_ptr()->num_players;
 
-	while (some_number) {
-		//printf("some_number %d\n", *some_number);
-		world_dynamics_system_remove_player(g_world_ptr(), nullptr, some_number - 1);
+    {
+		//printf("some_number %d %d\n", *some_number, num_players);
+		world_dynamics_system_remove_player(g_world_ptr(), nullptr, num_players - 1);
 	}
 
 	debug_enabled = 0;
