@@ -1615,8 +1615,9 @@ void handle_warp_entry(debug_menu_entry* entry) {
 
 void handle_char_select_entry(debug_menu_entry* entry) {
 
-	auto num_players = g_world_ptr()->num_players;
-
+    for (auto num_players = g_world_ptr()->num_players;
+            num_players != 0;
+            num_players = g_world_ptr()->num_players)
     {
 		//printf("some_number %d %d\n", *some_number, num_players);
 		world_dynamics_system_remove_player(g_world_ptr(), nullptr, num_players - 1);
