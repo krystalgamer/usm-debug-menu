@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
@@ -110,11 +111,12 @@ typedef struct _list{
 static constexpr DWORD MAX_ELEMENTS_PAGE = 18;
 
 
-typedef enum {
+enum debug_menu_entry_type {
 	NORMAL,
 	BOOLEAN_E,
+    INTEGER,
 	CUSTOM
-} debug_menu_entry_type;
+};
 
 typedef enum {
 	LEFT,
@@ -131,6 +133,7 @@ struct debug_menu_entry {
 	debug_menu_entry_type entry_type;
 	void* data;
 	void* data1;
+    uint16_t m_id {0};
 	custom_string_generator_ptr custom_string_generator;
     void (*m_game_flags_handler)(debug_menu_entry *);
 
@@ -151,7 +154,7 @@ struct debug_menu_entry {
 typedef void (*menu_handler_function)(debug_menu_entry*, custom_key_type key_type);
 typedef void (*go_back_function)();
 
-typedef struct {
+struct debug_menu {
 	char title[MAX_CHARS];
 	DWORD capacity;
 	DWORD used_slots;
@@ -160,7 +163,7 @@ typedef struct {
 	go_back_function go_back;
 	menu_handler_function handler;
 	debug_menu_entry* entries;
-} debug_menu;
+};
 
 debug_menu* start_debug = nullptr;
 debug_menu* warp_menu = nullptr;
@@ -478,6 +481,14 @@ std::string getRealText(debug_menu_entry* entry) {
 		sprintf(str, "%s: %s", entry->text, *val ? "True" : "False");
 		return {str};
 	}
+    else if(entry->entry_type == INTEGER)
+    {
+		int val = (int) entry->data;
+
+        char str[100]; 
+		sprintf(str, "%s: %d", entry->text, val);
+        return {str};
+    }
 
 	if (entry->entry_type == CUSTOM) {
 		return entry->custom_string_generator(entry);
@@ -1172,14 +1183,10 @@ void menu_setup(int game_state, int keyboard) {
 			add_debug_menu_entry(options_menu, &live_in_glass_house);
 
 
-			BYTE* god_mode = (BYTE *) 0x95A6A8;
-			debug_menu_entry god_mode_entry = { "God Mode ", BOOLEAN_E,  &god_mode[0] };
-			debug_menu_entry mega_god_mode = { "Mega God Mode ", BOOLEAN_E,  &god_mode[1] };
-			debug_menu_entry ultra_god_mode = { "Ultra God Mode ", BOOLEAN_E,  &god_mode[2] };
+			debug_menu_entry god_mode_entry = { "God Mode ", INTEGER, (void *) 0 };
+            god_mode_entry.m_id = 5;
 
-			add_debug_menu_entry(options_menu, &god_mode_entry);
-			add_debug_menu_entry(options_menu, &mega_god_mode);
-			add_debug_menu_entry(options_menu, &ultra_god_mode);
+            add_debug_menu_entry(options_menu, &god_mode_entry);
 		}
 	}
 }
@@ -1215,7 +1222,9 @@ void menu_input_handler(int keyboard, int SCROLL_SPEED) {
 	else if (is_menu_key_pressed(MENU_LEFT, keyboard) || is_menu_key_pressed(MENU_RIGHT, keyboard)) {
 
 		debug_menu_entry* cur = &current_menu->entries[current_menu->window_start + current_menu->cur_index];
-		if (cur->entry_type == BOOLEAN_E || cur->entry_type == CUSTOM)
+		if (cur->entry_type == BOOLEAN_E ||
+                cur->entry_type == INTEGER ||
+                cur->entry_type == CUSTOM)
 			current_menu->handler(cur, (is_menu_key_pressed(MENU_LEFT, keyboard) ? LEFT : RIGHT));
 	}
 }
@@ -1628,7 +1637,33 @@ void handle_char_select_entry(debug_menu_entry* entry) {
 	current_costume = entry->text;
 }
 
-void handle_options_select_entry(debug_menu_entry* entry) {
+void set_god_mode(int a1)
+{
+    CDECL_CALL(0x004BC040, a1);
+}
+
+void handle_options_select_entry(debug_menu_entry* entry, custom_key_type key_type) {
+
+    if (entry->m_id == 5)
+    {
+        auto val = (int) entry->data;
+        if (key_type == LEFT)
+        {
+            --val;
+        }
+        else if (key_type == RIGHT)
+        {
+            ++val;
+        }
+
+        val = std::clamp(val, 0, 5);
+
+        entry->data = (void *) val;
+
+        set_god_mode(val);
+
+        return;
+    }
 
 	BYTE* val = (BYTE *) entry->data;
 	*val = !*val;
@@ -1680,7 +1715,7 @@ void setup_debug_menu() {
 	warp_menu = create_menu("Missions", goto_start_debug, (menu_handler_function) handle_warp_entry, 300);
 	missions_menu = create_menu("Missions", goto_start_debug, (menu_handler_function) handle_missions_entry, 300);
 	char_select_menu = create_menu("Char Select", goto_start_debug, (menu_handler_function) handle_char_select_entry, 5);
-	options_menu = create_menu("Options", goto_start_debug, (menu_handler_function) handle_options_select_entry, 2);
+	options_menu = create_menu("Options", goto_start_debug, handle_options_select_entry, 2);
 	script_menu = create_menu("Script", goto_start_debug, (menu_handler_function) handle_script_select_entry, 50);
 	progression_menu = create_menu("Progression", goto_start_debug, (menu_handler_function) handle_progression_select_entry, 10);
 	district_variants_menu = create_menu("District variants", goto_start_debug, handle_distriction_variants_select_entry, 15);
