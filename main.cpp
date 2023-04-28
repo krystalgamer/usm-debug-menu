@@ -118,14 +118,16 @@ enum debug_menu_entry_type {
 	CUSTOM
 };
 
-typedef enum {
+enum custom_key_type {
 	LEFT,
 	RIGHT,
 	ENTER
-} custom_key_type;
+};
 
 struct debug_menu_entry;
 typedef char* (*custom_string_generator_ptr)(debug_menu_entry* entry);
+
+struct debug_menu;
 
 struct debug_menu_entry {
 
@@ -143,6 +145,13 @@ struct debug_menu_entry {
     }
 
     debug_menu_entry() = default;
+
+    debug_menu_entry(const char *p_text) : entry_type(NORMAL), data(nullptr)
+    {
+        strncpy(this->text, p_text, MAX_CHARS_SAFE);
+    }
+
+    debug_menu_entry(debug_menu *submenu);
 
     debug_menu_entry(const char *p_text, debug_menu_entry_type p_type, void *p_data) :
         entry_type(p_type), data(p_data)
@@ -164,6 +173,11 @@ struct debug_menu {
 	menu_handler_function handler;
 	debug_menu_entry* entries;
 };
+
+debug_menu_entry::debug_menu_entry(debug_menu *submenu) : entry_type(NORMAL), data(submenu)
+{
+    strncpy(this->text, submenu->title, MAX_CHARS_SAFE);
+}
 
 debug_menu* start_debug = nullptr;
 debug_menu* warp_menu = nullptr;
@@ -983,7 +997,7 @@ void setup_warp_menu()
 {
     if (warp_menu->used_slots == 0) {
 
-		debug_menu_entry poi = { "--- WARP TO POI ---", NORMAL, nullptr};
+		debug_menu_entry poi = { "--- WARP TO POI ---" };
 		poi.data1 = (void *) 1;
 		add_debug_menu_entry(warp_menu, &poi);
 
@@ -1059,7 +1073,7 @@ void populate_missions_menu()
 
         auto *head_menu = missions_menu;
 
-        debug_menu_entry mission_unload_entry {"UNLOAD CURRENT MISSION", NORMAL, nullptr};
+        debug_menu_entry mission_unload_entry {"UNLOAD CURRENT MISSION"};
 
         mission_unload_entry.set_game_flags_handler(mission_unload_handler);
         add_debug_menu_entry(head_menu, &mission_unload_entry);
@@ -1089,7 +1103,7 @@ void populate_missions_menu()
 
                 auto *v25 = create_menu(v53.to_string(), nullptr, nullptr, 10);
 
-                debug_menu_entry v26 {v53.to_string(), NORMAL, v25};
+                debug_menu_entry v26 {v25};
 
                 add_debug_menu_entry(head_menu, &v26);
             }
@@ -1138,7 +1152,7 @@ void populate_missions_menu()
                         v47 = buff;
                     }
 
-                    debug_menu_entry v27 {v47.c_str(), NORMAL, nullptr};
+                    debug_menu_entry v27 {v47.c_str()};
 
                     //v27->set_id(v50);
                     v27.data1 = (void *) v50;
@@ -1426,7 +1440,7 @@ int __fastcall game_handle_game_states(void* self, void* edx, void* a2) {
 
 		if (!changing_model) {
 			mString str;
-			mString_constructor(&str, nullptr, current_costume);
+            mString_constructor(&str, nullptr, current_costume);
 			world_dynamics_system_add_player(g_world_ptr(), nullptr, &str);
 			mString_finalize(&str, nullptr, 0);
 			game_unpause(g_game_ptr);
@@ -1720,13 +1734,13 @@ void setup_debug_menu() {
 	progression_menu = create_menu("Progression", goto_start_debug, (menu_handler_function) handle_progression_select_entry, 10);
 	district_variants_menu = create_menu("District variants", goto_start_debug, handle_distriction_variants_select_entry, 15);
 
-	debug_menu_entry warp_entry = { "Warp", NORMAL, warp_menu };
-	debug_menu_entry missions_entry = { "Missions", NORMAL, missions_menu };
-	debug_menu_entry char_select = { "Char Select", NORMAL, char_select_menu };
-	debug_menu_entry options_entry = { "Options", NORMAL, options_menu };
-	debug_menu_entry script_entry = { "Script", NORMAL, script_menu };
-	debug_menu_entry progression_entry = { "Progression", NORMAL, progression_menu };
-	debug_menu_entry district_entry = { "District variants", NORMAL, district_variants_menu };
+	debug_menu_entry warp_entry { warp_menu };
+	debug_menu_entry missions_entry { missions_menu };
+	debug_menu_entry char_select { char_select_menu };
+	debug_menu_entry options_entry { options_menu };
+	debug_menu_entry script_entry { script_menu };
+	debug_menu_entry progression_entry { progression_menu };
+	debug_menu_entry district_entry { district_variants_menu };
 
 	add_debug_menu_entry(start_debug, &warp_entry);
 	add_debug_menu_entry(start_debug, &missions_entry);
