@@ -1712,7 +1712,7 @@ void handle_distriction_variants_select_entry(debug_menu_entry* entry, custom_ke
 void setup_debug_menu() {
 
 	start_debug = create_menu("Debug Menu", close_debug, (menu_handler_function) handle_debug_entry, 2);
-	warp_menu = create_menu("Missions", goto_start_debug, (menu_handler_function) handle_warp_entry, 300);
+	warp_menu = create_menu("Warp", goto_start_debug, (menu_handler_function) handle_warp_entry, 300);
 	missions_menu = create_menu("Missions", goto_start_debug, (menu_handler_function) handle_missions_entry, 300);
 	char_select_menu = create_menu("Char Select", goto_start_debug, (menu_handler_function) handle_char_select_entry, 5);
 	options_menu = create_menu("Options", goto_start_debug, handle_options_select_entry, 2);
