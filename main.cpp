@@ -1652,7 +1652,7 @@ void create_gamefile_menu(debug_menu *)
 namespace spider_monkey {
     bool is_running()
     {
-        CDECL_CALL(0x004B3B60);
+        return (bool) CDECL_CALL(0x004B3B60);
     }
 }
 
