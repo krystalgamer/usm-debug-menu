@@ -1513,6 +1513,12 @@ void handle_missions_entry(debug_menu_entry* entry)
 void handle_game_entry(debug_menu_entry *entry, custom_key_type )
 {
     printf("entry->text = %s\n", entry->text);
+
+    if (entry->entry_type == POINTER_MENU)
+    {
+        return;
+    }
+
     assert(entry->m_game_flags_handler != nullptr);
 
     entry->m_game_flags_handler(entry);

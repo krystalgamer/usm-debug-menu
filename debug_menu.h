@@ -8,10 +8,11 @@ constexpr auto MAX_CHARS_SAFE = 63;
 constexpr auto MAX_CHARS = MAX_CHARS_SAFE + 1;
 
 enum debug_menu_entry_type {
-	NORMAL,
+    NORMAL,
     INTEGER,
-	BOOLEAN_E,
+    BOOLEAN_E,
     POINTER_BOOL,
+    POINTER_MENU,
 	CUSTOM
 };
 
@@ -116,7 +117,7 @@ struct debug_menu {
     void add_entry(debug_menu_entry *entry);
 };
 
-debug_menu_entry::debug_menu_entry(debug_menu *submenu) : entry_type(NORMAL), data(submenu)
+debug_menu_entry::debug_menu_entry(debug_menu *submenu) : entry_type(POINTER_MENU), data(submenu)
 {
     strncpy(this->text, submenu->title, MAX_CHARS_SAFE);
 }
