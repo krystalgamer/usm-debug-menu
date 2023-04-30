@@ -37,6 +37,9 @@
     <ClInclude Include="common.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="debug_menu.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="fixedstring32.h" />
   </ItemGroup>
   <ItemGroup>
@@ -59,6 +62,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="mstring.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="os_developer_options.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="region.h" />
