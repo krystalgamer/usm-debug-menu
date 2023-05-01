@@ -103,6 +103,9 @@
     <ClInclude Include="variable.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="vtbl.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="wds.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
