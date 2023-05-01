@@ -40,6 +40,9 @@
     <ClInclude Include="debug_menu.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="entity.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="fixedstring32.h" />
   </ItemGroup>
   <ItemGroup>
@@ -47,6 +50,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="func_wrapper.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="game.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="geometry_manager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="input_mgr.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="mashable_vector.h" />
@@ -77,6 +89,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource_manager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="spider_monkey.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="terrain.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utility.h" />
@@ -154,7 +172,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <ExceptionHandling>false</ExceptionHandling>
       <BufferSecurityCheck>false</BufferSecurityCheck>
@@ -168,7 +186,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -182,7 +200,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -198,7 +216,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>

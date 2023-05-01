@@ -16,6 +16,16 @@ struct os_developer_options
         return this->m_ints[this->get_int_from_name(a2)];
     }
 
+    void set_int(const mString &a2, int a3)
+    {
+        this->m_ints[this->get_int_from_name(a2)] = a3;
+    }
+
+    void set_flag(const mString &a2, bool a3)
+    {
+        this->m_flags[this->get_flag_from_name(a2)] = a3;
+    }
+
     static inline Var<const char *[76]> int_names { 0x00936940 };
 
     static inline Var<int[76]> int_defaults{0x00936A70};

@@ -32,4 +32,10 @@ namespace resource_manager {
         return (bool) CDECL_CALL(0x0052A820, &a1, a2, a3, a4);
     }
 
+    void set_active_district(bool a1)
+    {
+        void __fastcall (*func)(void *, int, bool) = (decltype(func)) 0x00573620;
+        func(nullptr, 0, a1);
+    }
+
 }

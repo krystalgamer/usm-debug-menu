@@ -10,6 +10,7 @@ constexpr auto MAX_CHARS = MAX_CHARS_SAFE + 1;
 enum debug_menu_entry_type {
     NORMAL,
     INTEGER,
+    POINTER_INT,
     BOOLEAN_E,
     POINTER_BOOL,
     POINTER_MENU,
@@ -37,6 +38,7 @@ struct debug_menu_entry {
 	custom_string_generator_ptr custom_string_generator;
     void (*m_game_flags_handler)(debug_menu_entry *);
     float field_20[4];
+    bool m_value_initialized;
 
     void set_id(int id)
     {
@@ -48,10 +50,109 @@ struct debug_menu_entry {
         return m_id;
     }
 
+    bool get_bval() const
+    {
+        auto v2 = this->entry_type;
+        if ( v2 == BOOLEAN_E )
+        {
+            return (bool) this->data;
+        }
+
+        if ( v2 == POINTER_BOOL )
+        {
+            return *(bool *) this->data;
+        }
+
+        assert(0);
+        return 0;
+    }
+
+    int get_ival()
+    {
+        auto v2 = this->entry_type;
+        if ( v2 == INTEGER )
+        {
+            return (int) this->data;
+        }
+
+        if ( v2 == POINTER_INT )
+        {
+            return *(int*) this->data;
+        }
+
+        assert(0);
+        return 0;
+    }
+
+    bool is_value_initialized() const
+    {
+        return this->m_value_initialized;
+    }
+
+    int set_ival(int a2, bool a3)
+    {
+        if ( !this->is_value_initialized() )
+        {
+            if ( (float)a2 > this->field_20[1] )
+                a2 = (int)this->field_20[1];
+
+            if ( this->field_20[0] > (float)a2 )
+                a2 = (int)this->field_20[0];
+
+            auto v4 = this->entry_type;
+            if ( v4 == INTEGER )
+            {
+                this->data = (void *) a2;
+            }
+            else if ( v4 == POINTER_INT )
+            {
+                *((int *) this->data) = a2;
+            }
+            else
+            {
+                assert(0);
+            }
+
+            if ( this->m_game_flags_handler != nullptr && a3 )
+            {
+                this->m_game_flags_handler(this);
+            }
+        }
+
+        return this->get_ival();
+    }
+
     void set_bval(bool a2)
     {
         this->entry_type = BOOLEAN_E;
         this->data = (void *) a2;
+    }
+
+    bool set_bval(bool a2, bool a3)
+    {
+        if ( !this->is_value_initialized() )
+        {
+            auto v4 = this->entry_type;
+            if ( v4 == BOOLEAN_E )
+            {
+                this->data = (void *) a2;
+            }
+            else if ( v4 == POINTER_BOOL )
+            {
+                * ((int *) this->data) = a2;
+            }
+            else
+            {
+                assert(0);
+            }
+
+            if ( this->m_game_flags_handler != nullptr && a3 )
+            {
+                this->m_game_flags_handler(this);
+            }
+        }
+
+        return this->get_bval();
     }
 
     void set_pt_bval(bool *a2)
@@ -104,6 +205,8 @@ struct debug_menu_entry {
 typedef void (*menu_handler_function)(debug_menu_entry*, custom_key_type key_type);
 typedef void (*go_back_function)();
 
+void close_debug();
+
 struct debug_menu {
 	char title[MAX_CHARS];
 	DWORD capacity;
@@ -115,6 +218,13 @@ struct debug_menu {
 	debug_menu_entry* entries;
 
     void add_entry(debug_menu_entry *entry);
+
+    static void hide()
+    {
+        close_debug();
+    }
+
+    static inline bool physics_state_on_exit = true;
 };
 
 debug_menu_entry::debug_menu_entry(debug_menu *submenu) : entry_type(POINTER_MENU), data(submenu)

@@ -17,6 +17,8 @@
 #pragma comment(lib, "Dinput8.lib")
 #pragma comment(lib, "Dxguid.lib")
 
+#include "game.h"
+#include "input_mgr.h"
 #include "resource_manager.h"
 #include "forwards.h"
 #include "variable.h"
@@ -28,8 +30,10 @@
 #include "region.h"
 #include "debug_menu.h"
 #include "os_developer_options.h"
-
-void* g_game_ptr = nullptr;
+#include "spider_monkey.h"
+#include "geometry_manager.h"
+#include "entity.h"
+#include "terrain.h"
 
 DWORD* ai_current_player = nullptr;
 DWORD* fancy_player_ptr = nullptr;
@@ -137,6 +141,10 @@ void goto_start_debug() {
 	current_menu = start_debug;
 }
 
+void goto_game_flags_menu() {
+    current_menu = game_menu;
+}
+
 void unlock_region(region* cur_region) {
 
 	cur_region->status &= 0xFE;
@@ -168,8 +176,6 @@ void remove_debug_menu_entry(debug_menu_entry* entry) {
 
 }
 
-
-
 int vm_debug_menu_entry_garbage_collection_id = -1;
 
 typedef int (*script_manager_register_allocated_stuff_callback_ptr)(void* func);
@@ -188,7 +194,6 @@ void vm_debug_menu_entry_garbage_collection_callback(void* a1, list* lst) {
 		//printf("Will delete %s %08X\n", entry->text, entry);
 		remove_debug_menu_entry(entry);
 	}
-	
 }
 
 int construct_client_script_libs_hook() {
@@ -200,7 +205,6 @@ int construct_client_script_libs_hook() {
 
 	return construct_client_script_libs();
 }
-
 
 region** all_regions = (region **) 0x0095C924;
 DWORD* number_of_allocated_regions = (DWORD *) 0x0095C920;
@@ -418,15 +422,14 @@ void render_current_debug_menu() {
         debug_width = std::max(debug_width, cur_width);\
 	};
 
-	//printf("new size: %s %d %d (%d %d)\n", x, debug_width, debug_height, cur_width, cur_height); \
-
+	//printf("new size: %s %d %d (%d %d)\n", x, debug_width, debug_height, cur_width, cur_height);
 
 	get_and_update(current_menu->title);
 	get_and_update(UP_ARROW);
 
 	int total_elements_page = needs_down_arrow ? MAX_ELEMENTS_PAGE : current_menu->used_slots - current_menu->window_start;
 
-	for (int i = 0; i < total_elements_page; i++) {
+	for (int i = 0; i < total_elements_page; ++i) {
 
 		debug_menu_entry *entry = &current_menu->entries[current_menu->window_start + i];
 		auto cur = getRealText(entry);
@@ -589,13 +592,6 @@ typedef struct {
 	vm_thread* thread;
 } slf;
 
-typedef struct {
-	DWORD unk[32];
-} string_hash;
-
-typedef void(__fastcall* string_hash_initialize_ptr)(string_hash* , void* edx, int a2, char* Str1, int a4);
-string_hash_initialize_ptr string_hash_initialize = (string_hash_initialize_ptr) 0x00547A00;
-
 
 typedef int(__fastcall* script_object_find_func_ptr)(script_object* , void* edx, string_hash* a2);
 script_object_find_func_ptr script_object_find_func = (script_object_find_func_ptr) 0x0058EF80;
@@ -623,7 +619,7 @@ uint8_t __stdcall slf__debug_menu_entry__set_handler__str(slf* function, void* u
 	char* scrpttext = static_cast<char *>(params[1]);
 
 	string_hash strhash;
-	string_hash_initialize(&strhash, nullptr, 0, scrpttext, 0);
+    strhash.initialize(0, scrpttext, 0);
 
 	script_instance* instance = function->thread->instance;
 	int functionid = script_object_find_func(instance->object, nullptr, (string_hash *) *(DWORD*)&strhash);
@@ -655,7 +651,7 @@ uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
 
 
 	string_hash strhash;
-	string_hash_initialize(&strhash, nullptr, 0, strs[1], 0);
+	strhash.initialize(0, strs[1], 0);
 
 	script_instance* instance = function->thread->instance;
 	int functionid = script_object_find_func(instance->object, nullptr, (string_hash *) *(DWORD*)&strhash);
@@ -917,8 +913,6 @@ resource_manager_can_reload_amalgapak_ptr resource_manager_can_reload_amalgapak 
 typedef void (*resource_manager_reload_amalgapak_ptr)(void);
 resource_manager_reload_amalgapak_ptr resource_manager_reload_amalgapak = (resource_manager_reload_amalgapak_ptr) 0x0054C2E0;
 
-void close_debug();
-
 struct mission_t
 {
     std::string field_0;
@@ -1062,11 +1056,11 @@ void menu_setup(int game_state, int keyboard) {
 	if (is_menu_key_pressed(MENU_TOGGLE, keyboard) && (game_state == 6 || game_state == 7)) {
 
 		if (debug_enabled && game_state == 7) {
-			game_unpause(g_game_ptr);
+			game_unpause(g_game_ptr());
 			debug_enabled = !debug_enabled;
 		}
 		else if (!debug_enabled && game_state == 6) {
-			game_pause(g_game_ptr);
+			game_pause(g_game_ptr());
 			debug_enabled = !debug_enabled;
 			current_menu = start_debug;
 		}
@@ -1155,8 +1149,10 @@ HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* self, DWORD cbData, LP
 			GetDeviceStateHandleControllerInput(lpvData);
 
 		int game_state = 0;
-		if (g_game_ptr)
-			game_state = game_get_cur_state(g_game_ptr);
+		if (g_game_ptr())
+        {
+			game_state = game_get_cur_state(g_game_ptr());
+        }
 
 		//printf("INSERT %d %d %c\n", keys[DIK_INSERT], game_state, debug_enabled ? 'y' : 'n');
 
@@ -1318,13 +1314,13 @@ void update_state() {
 }
 */
 
-typedef int(__fastcall* game_handle_game_states_ptr)(void* , void* edx, void* a2);
+typedef int(__fastcall* game_handle_game_states_ptr)(game* , void* edx, void* a2);
 game_handle_game_states_ptr game_handle_game_states_original = (game_handle_game_states_ptr) 0x0055D510;
 
-int __fastcall game_handle_game_states(void* self, void* edx, void* a2) {
+int __fastcall game_handle_game_states(game* self, void* edx, void* a2) {
 
-	if (!g_game_ptr) {
-		g_game_ptr = self;
+	if (!g_game_ptr()) {
+		g_game_ptr() = self;
 	}
 
 	if (changing_model) {
@@ -1335,7 +1331,7 @@ int __fastcall game_handle_game_states(void* self, void* edx, void* a2) {
 		if (!changing_model) {
 			mString str {current_costume};
 			world_dynamics_system_add_player(g_world_ptr(), nullptr, &str);
-			game_unpause(g_game_ptr);
+			game_unpause(g_game_ptr());
 		}
 	}
 
@@ -1489,7 +1485,7 @@ void install_patches() {
 
 void close_debug() {
 	debug_enabled = 0;
-	game_unpause(g_game_ptr);
+	game_unpause(g_game_ptr());
 }
 
 void handle_debug_entry(debug_menu_entry* entry, custom_key_type) {
@@ -1510,13 +1506,39 @@ void handle_missions_entry(debug_menu_entry* entry)
 	close_debug();
 }
 
-void handle_game_entry(debug_menu_entry *entry, custom_key_type )
+void handle_game_entry(debug_menu_entry *entry, custom_key_type key_type)
 {
     printf("entry->text = %s\n", entry->text);
 
-    if (entry->entry_type == POINTER_MENU)
+    if (key_type == ENTER)
     {
-        return;
+        switch(entry->entry_type)
+        {
+        case BOOLEAN_E: 
+        case POINTER_BOOL:
+        {
+            auto v3 = entry->get_bval();
+            entry->set_bval(!v3, true);
+            break;
+        } 
+        case POINTER_MENU:
+        {
+            if (entry->data != nullptr)
+            {
+                current_menu = static_cast<decltype(current_menu)>(entry->data);
+            }
+            return;
+        }
+        default:
+            break;
+        }
+    }
+    else if (key_type == LEFT || key_type == RIGHT)
+    {
+        if (key_type == LEFT)
+        {}
+        else if (key_type == RIGHT)
+        {}
     }
 
     assert(entry->m_game_flags_handler != nullptr);
@@ -1662,9 +1684,254 @@ namespace spider_monkey {
     }
 }
 
-void game_flags_handler(debug_menu_entry *)
+void game_flags_handler(debug_menu_entry *a1)
 {
+    switch ( a1->get_id() )
+    {
+    case 0u: //Physics Enabled
+    {
+        auto v1 = a1->get_bval();
+        g_game_ptr()->enable_physics(v1);
+        debug_menu::physics_state_on_exit = a1->get_bval();
+        break;
+    }
+    case 1u: //Single Step
+    {
+        g_game_ptr()->flag.single_step = true;
+        break;
+    }
+    case 2u: //Slow Motion Enabled
+    {
+        static int old_frame_lock = 0;
+        int v27;
+        if ( a1->get_bval() )
+        {
+            old_frame_lock = os_developer_options::instance()->get_int(mString{"FRAME_LOCK"});
+            v27 = 120;
+        }
+        else
+        {
+            v27 = old_frame_lock;
+        }
 
+        os_developer_options::instance()->set_int(mString{"FRAME_LOCK"}, v27);
+        debug_menu::hide();
+        break;
+    }
+    case 3u: //Monkey Enabled
+    {
+        if ( a1->get_bval() )
+        {
+            spider_monkey::start();
+            spider_monkey::on_level_load();
+            auto *v2 = input_mgr::instance();
+            auto *rumble_device = v2->rumble_ptr;
+
+            assert(rumble_device != nullptr);
+            rumble_device->disable_vibration();
+        }
+        else
+        {
+            spider_monkey::on_level_unload();
+            spider_monkey::stop();
+        }
+
+        debug_menu::hide();
+        break;
+    }
+    case 4u:
+    {
+        auto *v3 = input_mgr::instance();
+        auto *rumble_device = v3->rumble_ptr;
+        assert(rumble_device != nullptr);
+
+        if ( a1->get_bval() )
+            rumble_device->enable_vibration();
+        else
+            rumble_device->disable_vibration();
+
+        break;
+    }
+    case 5u: //God Mode
+    {
+        auto v4 = a1->get_ival();
+        set_god_mode(v4);
+        debug_menu::hide();
+        break;
+    }
+    case 6u: //Show Districts
+    {
+        debug_menu::hide();
+        os_developer_options::instance()->set_flag(mString{"SHOW_STREAMER_INFO"}, a1->get_bval());
+
+        if ( a1->get_bval() )
+        {
+            os_developer_options::instance()->set_flag(mString{"SHOW_DEBUG_TEXT"}, true);
+        }
+
+        //TODO
+        //sub_66C242(&g_game_ptr->field_4C);
+        break;
+    }
+    case 7u: //Show Hero Position
+    {
+        debug_menu::hide();
+        os_developer_options::instance()->set_flag(mString{"SHOW_DEBUG_INFO"}, a1->get_bval());
+        break;
+    }
+    case 8u:
+    {
+        debug_menu::hide();
+        os_developer_options::instance()->set_flag(mString{"SHOW_FPS"}, a1->get_bval());
+        break;
+    }
+    case 9u:
+    {
+        auto v24 = a1->get_bval();
+        auto *v5 = input_mgr::instance();
+        if ( !v5->field_30[1] )
+        {
+            v24 = false;
+        }
+
+
+        os_developer_options::instance()->set_flag(mString{"USERCAM_ON_CONTROLLER2"}, v24);
+        auto *v6 = input_mgr::instance();
+        auto *v23 = v6->field_30[1];
+
+        //TODO
+        /*
+        if ( !(*(unsigned __int8 (__thiscall **)(int))(*(_DWORD *)v23 + 44))(v23) )
+        {
+            j_debug_print_va("Controller 2 is not connected!");
+            ->set_bval(a1, 0, 1);
+            v24 = 0;
+        }
+        if ( v24 )
+        {
+            j_debug_print_va("User cam (theoretically) enabled on controller 2");
+            v7 = (*(int (__thiscall **)(int))(*(_DWORD *)v23 + 8))(v23);
+            sub_676E45(g_mouselook_controller, v7);
+        }
+        else
+        {
+            sub_676E45(g_mouselook_controller, -1);
+        }
+        */
+
+        auto *v8 = g_world_ptr()->get_hero_ptr(0);
+        if ( v8 != nullptr && g_game_ptr()->field_172 )
+        {
+            if ( a1->get_bval() )
+            {
+                auto *v14 = g_world_ptr()->get_hero_ptr(0);
+                v14->unsuspend(1);
+            }
+            else
+            {
+                auto *v15 = g_world_ptr()->get_hero_ptr(0);
+                v15->suspend(1);
+            }
+        }
+        break;
+    }
+    case 11u: //Hires Screenshot
+    {
+        debug_menu::hide();
+        auto a2 = os_developer_options::instance()->get_int(mString{"HIRES_SCREENSHOT_X"});
+        auto a3 = os_developer_options::instance()->get_int(mString{"HIRES_SCREENSHOT_Y"});
+        assert(a2 != 0 && a3 != 0 && "HIRES_SCREENSHOT_X and HIRES_SCREENSHOT_Y must be not equal 0");
+        g_game_ptr()->begin_hires_screenshot(a2, a3);
+        break;
+    }
+    case 12u: //Lores Screenshot
+    {
+        g_game_ptr()->push_lores();
+        break;
+    }
+    case 13u:
+    {
+        static auto load_districts = TRUE;
+        if ( load_districts )
+        {
+            auto *v11 = g_world_ptr()->the_terrain;
+            v11->unload_all_districts_immediate();
+            resource_manager::set_active_district(false);
+        }
+        else
+        {
+            resource_manager::set_active_district(true);
+        }
+
+        load_districts = !load_districts;
+        debug_menu::hide();
+        break;
+    }
+    case 14u:
+    {
+        //TODO
+        //sub_66FBE0();
+        debug_menu::hide();
+        break;
+    }
+    case 15u:
+    {
+        //sub_697DB1();
+        debug_menu::hide();
+        break;
+    }
+    case 16u:
+    {
+        //TODO
+        //sub_698D33();
+        debug_menu::hide();
+        break;
+    }
+    case 17u:
+    {
+        auto v12 = a1->get_bval();
+
+        //TODO
+        //sub_6A88A5(g_game_ptr, v12);
+        break;
+    }
+    case 18u:
+    {
+        auto v13 = a1->get_ival();
+        a1->set_ival(v13, 0);
+        auto v16 = a1->get_ival();
+        if ( v16 )
+        {
+            if ( v16 == 1 )
+            {
+                if ( geometry_manager::is_scene_analyzer_enabled() )
+                {
+                    geometry_manager::enable_scene_analyzer(false);
+                }
+
+                g_game_ptr()->field_172 = true;
+
+            }
+            else if ( v16 == 2 )
+            {
+                g_game_ptr()->field_172 = false;
+                geometry_manager::enable_scene_analyzer(true);
+            }
+        }
+        else
+        {
+            if ( geometry_manager::is_scene_analyzer_enabled() )
+            {
+                geometry_manager::enable_scene_analyzer(false);
+            }
+
+            g_game_ptr()->field_172 = false;
+        }
+    break;
+    }
+    default:
+    return;
+    }
 }
 
 void create_game_flags_menu(debug_menu *parent)
@@ -1752,38 +2019,43 @@ void create_game_flags_menu(debug_menu *parent)
     v89.set_id(13);
     v92->add_entry(&v89);
 
-    auto *v88 = create_menu("Save/Load", nullptr, nullptr, 10);
-    auto v18 = debug_menu_entry(v88);
-    v92->add_entry(&v18);
+    {
+        auto *v88 = create_menu("Save/Load", goto_game_flags_menu, handle_game_entry, 10);
+        auto v18 = debug_menu_entry(v88);
+        v92->add_entry(&v18);
 
-    v89 = debug_menu_entry(mString{"Save Game"});
-    v89.set_game_flags_handler(game_flags_handler);
-    v89.set_id(14);
-    v88->add_entry(&v89);
+        v89 = debug_menu_entry(mString{"Save Game"});
+        v89.set_game_flags_handler(game_flags_handler);
+        v89.set_id(14);
+        v88->add_entry(&v89);
 
-    v89 = debug_menu_entry(mString{"Load Game"});
-    v89.set_game_flags_handler(game_flags_handler);
-    v89.set_id(15);
-    v88->add_entry(&v89);
+        v89 = debug_menu_entry(mString{"Load Game"});
+        v89.set_game_flags_handler(game_flags_handler);
+        v89.set_id(15);
+        v88->add_entry(&v89);
 
-    v89 = debug_menu_entry(mString{"Attemp Auto Load"});
-    v89.set_game_flags_handler(game_flags_handler);
-    v89.set_id(16);
-    v88->add_entry(&v89);
+        v89 = debug_menu_entry(mString{"Attemp Auto Load"});
+        v89.set_game_flags_handler(game_flags_handler);
+        v89.set_id(16);
+        v88->add_entry(&v89);
+    }
 
-    auto *v87 = create_menu("Screenshot", nullptr, nullptr, 10);
-    auto v23 = debug_menu_entry(v87);
-    v92->add_entry(&v23);
+    {
+        auto *v87 = create_menu("Screenshot", goto_game_flags_menu, handle_game_entry, 10);
+        auto v23 = debug_menu_entry(v87);
+        v92->add_entry(&v23);
 
-    v89 = debug_menu_entry(mString{"Hires Screenshot"});
-    v89.set_game_flags_handler(game_flags_handler);
-    v89.set_id(11);
-    v87->add_entry(&v89);
+        v89 = debug_menu_entry(mString{"Hires Screenshot"});
+        v89.set_game_flags_handler(game_flags_handler);
+        v89.set_id(11);
+        v87->add_entry(&v89);
 
-    v89 = debug_menu_entry(mString{"Lores Screenshot"});
-    v89.set_game_flags_handler(game_flags_handler);
-    v89.set_id(12);
-    v87->add_entry(&v89);
+        v89 = debug_menu_entry(mString{"Lores Screenshot"});
+        v89.set_game_flags_handler(game_flags_handler);
+        v89.set_id(12);
+        v87->add_entry(&v89);
+    }
+
     create_devopt_menu(v92);
     create_gamefile_menu(v92);
 }

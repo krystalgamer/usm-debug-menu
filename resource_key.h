@@ -1,19 +1,11 @@
 #pragma once
 
 #include "func_wrapper.h"
+#include "string_hash.h"
 
 struct resource_key
 {
-    struct {
-        unsigned int field_0;
-
-        const char *to_string()
-        {
-            auto func = bit_cast<fastcall_call>(0x005374B0);
-            return (const char *) func(this);
-        }
-
-    } field_0;
+    string_hash field_0;
     int field_4;
 };
 
