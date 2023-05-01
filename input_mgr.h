@@ -10,13 +10,13 @@ struct input_mgr
 
         void disable_vibration()
         {
-            void __fastcall (*func)(void *) = (decltype(func)) 0x005C5440;
+            void (__fastcall *func)(void *) = (decltype(func)) 0x005C5440;
             func(this);
         }
 
         void enable_vibration()
         {
-            void __fastcall (*func)(void *) = (decltype(func)) 0x005C5430;
+            void (__fastcall *func)(void *) = (decltype(func)) 0x005C5430;
             func(this);
         }
 

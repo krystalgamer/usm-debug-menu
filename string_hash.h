@@ -6,7 +6,7 @@ struct string_hash
 
     const char *to_string()
     {
-        const char * __fastcall (*func)(void *) = (decltype(func)) 0x005374B0;
+        const char * (__fastcall *func)(void *) = (decltype(func)) 0x005374B0;
         return func(this);
     }
 

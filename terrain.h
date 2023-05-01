@@ -34,7 +34,7 @@ struct terrain
 
     void unload_all_districts_immediate()
     {
-        void __fastcall (*func)(void *) = (decltype(func)) 0x00557350;
+        void (__fastcall *func)(void *) = (decltype(func)) 0x00557350;
         func(this);
     }
 

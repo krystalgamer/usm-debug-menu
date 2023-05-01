@@ -34,7 +34,7 @@ namespace resource_manager {
 
     void set_active_district(bool a1)
     {
-        void __fastcall (*func)(void *, int, bool) = (decltype(func)) 0x00573620;
+        void (__fastcall *func)(void *, int, bool) = (decltype(func)) 0x00573620;
         func(nullptr, 0, a1);
     }
 

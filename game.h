@@ -48,12 +48,12 @@ struct game
 
     void enable_physics(bool a2)
     {
-        void __fastcall (*func)(void*, int, bool) = (decltype(func)) 0x00515230;
+        void (__fastcall *func)(void*, int, bool) = (decltype(func)) 0x00515230;
         func(this, 0, a2);
     }
 
     void push_process(game_process &process) {
-        void __fastcall (*sub_570FD0)(void *, int, void *) = (decltype(sub_570FD0)) 0x00570FD0;
+        void (__fastcall *sub_570FD0)(void *, int, void *) = (decltype(sub_570FD0)) 0x00570FD0;
 
         sub_570FD0(&this->process_stack, 0, &process);
 
@@ -69,7 +69,7 @@ struct game
 
     void begin_hires_screenshot(int a2, int a3)
     {
-        void __fastcall (*func)(void *, void *, int, int) = (decltype(func)) 0x00548C10;
+        void (__fastcall *func)(void *, void *, int, int) = (decltype(func)) 0x00548C10;
         func(this, nullptr, a2, a3);
     }
 };
