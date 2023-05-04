@@ -16,14 +16,17 @@ struct terrain
 
     void update_region_pack_info()
     {
-        auto func = bit_cast<fastcall_call>(0x0054F380);
-        func(this);
+        THISCALL(0x0054F380, this);
     }
 
     region *find_region(string_hash a2)
     {
-        auto func = bit_cast<fastcall_call>(0x00534920);
-        return (region *) func(this, 0, a2);
+        return (region *) THISCALL(0x00534920, this, 0, a2);
+    }
+
+    region *find_region(const vector3d &a2, const region *a3)
+    {
+        return (region *) THISCALL(0x0052DFF0, this, &a2, a3);
     }
 
     void unload_district_immediate(int a2)

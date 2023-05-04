@@ -9,6 +9,8 @@ constexpr auto MAX_CHARS = MAX_CHARS_SAFE + 1;
 
 enum debug_menu_entry_type {
     NORMAL,
+    FLOAT_E,
+    POINTER_FLOAT,
     INTEGER,
     POINTER_INT,
     BOOLEAN_E,
@@ -36,8 +38,8 @@ struct debug_menu_entry {
 	void* data1;
     uint16_t m_id {0};
 	custom_string_generator_ptr custom_string_generator;
-    void (*m_game_flags_handler)(debug_menu_entry *);
-    float field_20[4];
+    void (*m_game_flags_handler)(debug_menu_entry *) = nullptr;
+    float field_20[4] = {0.f, 1.f, 0.1f, 10.f};
     bool m_value_initialized;
 
     void set_id(int id)
@@ -48,6 +50,106 @@ struct debug_menu_entry {
     auto get_id() const
     {
         return m_id;
+    }
+
+    void on_change(float a3, bool a4)
+    {
+        switch ( this->entry_type )
+        {
+        case FLOAT_E:
+        case POINTER_FLOAT:
+        {
+            float v6;
+            if ( a4 )
+                v6 = this->field_20[2] * this->field_20[3];
+            else
+                v6 = this->field_20[2];
+
+            auto v5 = this->get_fval() + a3 * v6;
+            this->set_fval(v5, true);
+            break;
+        }
+        case BOOLEAN_E:
+        case POINTER_BOOL:
+        {
+            auto v3 = this->get_bval();
+            this->set_bval(!v3, true);
+            break;
+        }
+        case INTEGER:
+        case POINTER_INT:
+        {
+            float v7 = (a4 ? this->field_20[2] * this->field_20[3] : this->field_20[2]);
+
+            printf("%f\n", v7);
+            auto v8 = std::abs(v7);
+            if ( v8 < 1.0 )
+            {
+                v8 = 1.0;
+            }
+
+            auto v4 = this->get_ival();
+            if ( a3 >= 0.0 )
+                this->set_ival((int)(v4 + v8), true);
+            else
+                this->set_ival((int)(v4 - v8), true);
+
+            break;
+        }
+        default:
+        return;
+        }
+    }
+
+    void set_fval(float a2, bool a3)
+    {
+        if ( !this->is_value_initialized() )
+        {
+            if ( a2 > this->field_20[1] )
+            {
+                a2 = this->field_20[1];
+            }
+
+            if ( this->field_20[0] > a2 )
+            {
+                a2 = this->field_20[0];
+            }
+
+            auto v3 = this->entry_type;
+            if ( v3 == FLOAT_E )
+            {
+                this->data = bit_cast<void *>(a2);
+            }
+            else if ( v3 == POINTER_FLOAT )
+            {
+                *(float *)this->data = a2;
+            }
+            else
+            {
+                assert(0);
+            }
+
+            if ( this->m_game_flags_handler != nullptr && a3 )
+            {
+                this->m_game_flags_handler(this);
+            }
+        }
+
+        this->get_fval();
+    }
+
+    float get_fval() {
+        auto v2 = this->entry_type;
+        if (v2 == FLOAT_E) {
+            return bit_cast<float>(this->data);
+        }
+
+        if (v2 == POINTER_FLOAT) {
+            return *(float *) this->data;
+        }
+
+        assert(0);
+        return 0.0;
     }
 
     bool get_bval() const
@@ -122,6 +224,28 @@ struct debug_menu_entry {
         return this->get_ival();
     }
 
+    void set_p_ival(int *a2)
+    {
+        this->entry_type = POINTER_INT;
+        this->data = (void *) a2;
+    }
+
+    void set_pt_fval(float *a2)
+    {
+        this->entry_type = POINTER_FLOAT;
+        this->data = bit_cast<void *>(a2);
+    }
+
+    void set_min_value(float a2)
+    {
+        this->field_20[0] = a2;
+    }
+
+    void set_max_value(float a2)
+    {
+        this->field_20[1] = a2;
+    }
+
     void set_bval(bool a2)
     {
         this->entry_type = BOOLEAN_E;
@@ -139,7 +263,7 @@ struct debug_menu_entry {
             }
             else if ( v4 == POINTER_BOOL )
             {
-                * ((int *) this->data) = a2;
+                * ((BOOL *) this->data) = a2;
             }
             else
             {

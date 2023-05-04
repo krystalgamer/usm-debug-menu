@@ -3,6 +3,7 @@
 #include "common.h"
 
 struct ai_player_controller;
+struct physical_interface;
 
 struct actor 
 {
@@ -11,6 +12,11 @@ struct actor
 
     ai_player_controller *get_player_controller() {
         return this->m_player_controller;
+    }
+
+    physical_interface *physical_ifc()
+    {
+        return (physical_interface *) THISCALL(0x004B8B40, this);
     }
 };
 

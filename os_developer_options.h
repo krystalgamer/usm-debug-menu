@@ -2,8 +2,7 @@
 
 #include "variable.h"
 #include "func_wrapper.h"
-
-struct mString;
+#include "mstring.h"
 
 struct os_developer_options
 {
@@ -31,22 +30,20 @@ struct os_developer_options
     static inline Var<int[76]> int_defaults{0x00936A70};
 
     int get_int_from_name(const mString &a1) {
-        const char **v2 = int_names();
-        do {
-            if (_strcmpi(*v2, a1.c_str()) == 0) {
-                break;
-            }
 
-            ++v2;
-        
-        } while (v2 != bit_cast<const char **>(&int_defaults()));
+        auto func = [&a1](auto &v2) {
+            return (_strcmpi(v2, a1.c_str()) == 0);
+        };
 
-        int v3 = v2 - int_names();
-        if (v3 == 76) {
+        auto it = std::find_if(std::begin(int_names()),
+                                std::end(int_names()),
+                                func);
+
+        if (it == std::end(int_names())) {
             printf("Nonexistent int %s", a1.c_str());
         }
 
-        return v3;
+        return std::distance(std::begin(int_names()), it);
     }
 
     static inline Var<const char *[150]> flag_names { 0x00936420 };
@@ -71,6 +68,11 @@ struct os_developer_options
         return v3;
     }
 
+    bool get_flag(int a2)
+    {
+        return this->m_flags[a2];
+    }
+
     bool get_flag(const mString &a2)
     {
         return this->m_flags[this->get_flag_from_name(a2)];
@@ -78,3 +80,11 @@ struct os_developer_options
 
     static inline Var<os_developer_options *> instance{0x0096858C};
 };
+
+Var<int[76]> int_defaults{0x00936A70};
+
+Var<const char *[76]> int_names { 0x00936940 };
+
+Var<BOOL[150]> flag_defaults{0x00936678};
+
+Var<const char *[150]> flag_names { 0x00936420 };

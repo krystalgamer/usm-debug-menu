@@ -4,6 +4,13 @@ struct string_hash
 {
     unsigned int source_hash_code;
 
+    string_hash() = default;
+
+    string_hash(const char *a1)
+    {
+        THISCALL(0x00401960, this, a1);
+    }
+
     const char *to_string()
     {
         const char * (__fastcall *func)(void *) = (decltype(func)) 0x005374B0;

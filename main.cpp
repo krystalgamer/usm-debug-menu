@@ -297,12 +297,11 @@ int ReadOrWrite(int a1, HANDLE* a2, int a3, DWORD a4, LPCVOID lpBuffer, DWORD nN
 typedef void (*aeps_RenderAll_ptr)();
 aeps_RenderAll_ptr aeps_RenderAll_orig = (aeps_RenderAll_ptr)0x004D9310;
 
-void** nglSysFont = (void**)0x00975208;
 
-typedef void (*nglListAddString_ptr)(void* font, float x, float y, float z, DWORD color, float x_scale, float y_scale, const char* format, ...);
-nglListAddString_ptr nglListAddString = (nglListAddString_ptr) 0x00779E90;
-
-#define nglColor(r,g,b,a) ( (a << 24) |  (r << 16) | (g << 8) | (b & 255) )
+unsigned int nglColor(int r, int g, int b, int a)
+{
+    return ( (a << 24) |  (r << 16) | (g << 8) | (b & 255) );
+}
 
 typedef struct {
 	BYTE unk[100];
@@ -362,7 +361,7 @@ void getStringDimensions(const char* str, int* width, int* height) {
 
 int getStringHeight(const char* str) {
 	int height;
-	nglGetStringDimensions(*nglSysFont, str, nullptr, &height, 1.0, 1.0);
+	nglGetStringDimensions(nglSysFont(), str, nullptr, &height, 1.0, 1.0);
 	return height;
 }
 
@@ -370,25 +369,28 @@ std::string getRealText(debug_menu_entry* entry) {
 
     switch(entry->entry_type)
     {
-    case BOOLEAN_E:
+    case FLOAT_E:
+    case POINTER_FLOAT:
     {
-		bool val = static_cast<decltype(val)>(entry->data);
+		auto val = entry->get_fval();
+
+        char str[100]; 
+		sprintf(str, "%s: %.2f", entry->text, val);
+		return {str};
+	}
+    case BOOLEAN_E:
+    case POINTER_BOOL:
+    {
+		bool val = entry->get_bval();
 
         char str[100]; 
 		sprintf(str, "%s: %s", entry->text, val ? "True" : "False");
 		return {str};
 	}
-    case POINTER_BOOL:
-    {
-		bool* val = static_cast<decltype(val)>(entry->data);
-
-        char str[100]; 
-		sprintf(str, "%s: %s", entry->text, *val ? "True" : "False");
-		return {str};
-	}
     case INTEGER:
+    case POINTER_INT:
     {
-		int val = (int) entry->data;
+		auto val = entry->get_ival();
 
         char str[100]; 
 		sprintf(str, "%s: %d", entry->text, val);
@@ -885,7 +887,7 @@ void setup_warp_menu()
 		poi.data1 = (void *) 1;
 		add_debug_menu_entry(warp_menu, &poi);
 
-		for (int i = 0; i < *number_of_allocated_regions; ++i) {
+		for (auto i = 0u; i < *number_of_allocated_regions; ++i) {
 			region* cur_region = &(*all_regions)[i];
 			auto *region_name = region_get_name(cur_region);
 
@@ -980,8 +982,8 @@ void populate_missions_menu()
             {
                 table = v2->m_district_table_containers[i];
                 auto *reg = table->field_44;
-                auto *v6 = reg->get_name();
-                v53 = v6;
+                auto &v6 = reg->get_name();
+                v53 = v6.to_string();
 
                 auto v52 = reg->get_district_id();
 
@@ -1346,16 +1348,6 @@ int __fastcall game_handle_game_states(game* self, void* edx, void* a2) {
 	return game_handle_game_states_original(self, edx, a2);
 }
 
-typedef void(__fastcall* mString_update_guts_ptr)(char* , void* edx, const char* a2, signed int a3);
-mString_update_guts_ptr mString_update_guts = (mString_update_guts_ptr) 0x41F9D0;
-
-void __fastcall mString_update_guts_hook(char* self, void* edx, const char* a2, signed int a3) {
-
-	//printf("mString:%s\n", a2);
-
-
-	return mString_update_guts(self, edx, a2, a3);
-}
 
 typedef DWORD(__fastcall* ai_hero_base_state_check_transition_ptr)(DWORD* , void* edx, DWORD* a2, int a3);
 ai_hero_base_state_check_transition_ptr ai_hero_base_state_check_transition = (ai_hero_base_state_check_transition_ptr) 0x00478D80;
@@ -1425,6 +1417,8 @@ void install_patches() {
         HookFunc(0x005AC347, (DWORD) hook_controlfp, 0, "Patching call to controlfp");
     }
 
+    HookFunc(0x0052B4BF, (DWORD) spider_monkey::render, 0, "Patching call to spider_monkey::render");
+
 	HookFunc(0x004EACF0, (DWORD)aeps_RenderAll, 0, "Patching call to aeps::RenderAll");
 
 	HookFunc(0x0052B5D7, (DWORD)myDebugMenu, 0, "Hooking nglListEndScene to inject debug menu");
@@ -1443,8 +1437,6 @@ void install_patches() {
 
 
 	HookFunc(0x0055D742, (DWORD)game_handle_game_states, 0, "Hooking handle_game_states");
-
-	HookFunc(0x00421128, (DWORD)mString_update_guts_hook, 0, "Hooking mString_update_guts");
 
 	/*
 	WriteDWORD(0x00877524, ai_hero_base_state_check_transition_hook, "Hooking check_transition for peter hooded");
@@ -1536,14 +1528,14 @@ void handle_game_entry(debug_menu_entry *entry, custom_key_type key_type)
     else if (key_type == LEFT || key_type == RIGHT)
     {
         if (key_type == LEFT)
-        {}
+        {
+            entry->on_change(-1.0, true);
+        }
         else if (key_type == RIGHT)
-        {}
+        {
+            entry->on_change(1.0, true);
+        }
     }
-
-    assert(entry->m_game_flags_handler != nullptr);
-
-    entry->m_game_flags_handler(entry);
 }
 
 void handle_warp_entry(debug_menu_entry* entry) {
@@ -1560,7 +1552,6 @@ void handle_warp_entry(debug_menu_entry* entry) {
 	DWORD* some_ptr = ai_ai_core_get_info_node(ai_current_player[5], NULL, arg1, 1);
 	printf("WHYYYY %08X %08X\n", fancy_player_ptr, some_ptr);
 	*/
-
 
 	float final_pos[3] = { -203, 20, 430 };
 	if (entry->data1 == 0) {
@@ -1671,8 +1662,10 @@ void handle_distriction_variants_select_entry(debug_menu_entry* entry, custom_ke
 	}
 }
 
-void create_devopt_menu(debug_menu *)
-{}
+void create_devopt_menu(debug_menu *parent)
+{
+    assert(parent != nullptr);
+}
 
 void create_gamefile_menu(debug_menu *)
 {}

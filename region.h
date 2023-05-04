@@ -25,8 +25,8 @@ struct region {
 	uint8_t variants;
 	uint8_t unk4[0x6B];
 
-    const char *get_name() {
-        return this->mash_info->field_0.str;
+    auto &get_name() {
+        return this->mash_info->field_0;
     }
 
     int get_district_id() {
