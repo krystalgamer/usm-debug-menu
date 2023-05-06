@@ -17,6 +17,7 @@
 #pragma comment(lib, "Dinput8.lib")
 #pragma comment(lib, "Dxguid.lib")
 
+#include "devopt.h"
 #include "game.h"
 #include "input_mgr.h"
 #include "resource_manager.h"
@@ -1116,6 +1117,7 @@ void menu_input_handler(int keyboard, int SCROLL_SPEED) {
 
 		debug_menu_entry* cur = &current_menu->entries[current_menu->window_start + current_menu->cur_index];
 		if (cur->entry_type == POINTER_BOOL ||
+                cur->entry_type == POINTER_INT ||
                 cur->entry_type == INTEGER ||
                 cur->entry_type == CUSTOM)
 			current_menu->handler(cur, (is_menu_key_pressed(MENU_LEFT, keyboard) ? LEFT : RIGHT));
@@ -1614,6 +1616,46 @@ void handle_distriction_variants_select_entry(debug_menu_entry* entry, custom_ke
 void create_devopt_menu(debug_menu *parent)
 {
     assert(parent != nullptr);
+
+    auto *v22 = create_menu("Devopts", handle_game_entry, 300);
+
+    for ( auto idx = 0u; idx < NUM_OPTIONS; ++idx )
+    {
+        auto *v21 = get_option(idx);
+        switch ( v21->m_type )
+        {
+        case game_option_t::INT_OPTION:
+        {
+            auto v20 = debug_menu_entry(mString{v21->m_name});
+            v20.set_p_ival(v21->m_value.p_ival);
+            v20.set_min_value(-1000.0);
+            v20.set_max_value(1000.0);
+            v22->add_entry(&v20);
+            break;
+        }
+        case game_option_t::FLAG_OPTION:
+        {
+            auto v19 = debug_menu_entry(mString{v21->m_name});
+            v19.set_pt_bval((bool *) v21->m_value.p_bval);
+            v22->add_entry(&v19);
+            break;
+        }
+        case game_option_t::FLOAT_OPTION:
+        {
+            auto v18 = debug_menu_entry(mString{v21->m_name});
+            v18.set_pt_fval(v21->m_value.p_fval);
+            v18.set_min_value(-1000.0);
+            v18.set_max_value(1000.0);
+            v22->add_entry(&v18);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    auto v5 = debug_menu_entry(v22);
+    parent->add_entry(&v5);
 }
 
 void create_gamefile_menu(debug_menu *)

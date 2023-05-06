@@ -40,6 +40,9 @@
     <ClInclude Include="debug_menu.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="devopt.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="entity.h" />
   </ItemGroup>
   <ItemGroup>

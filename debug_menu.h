@@ -56,6 +56,8 @@ struct debug_menu_entry {
 
     void on_change(float a3, bool a4)
     {
+        printf("on_change\n");
+
         switch ( this->entry_type )
         {
         case FLOAT_E:
@@ -63,9 +65,13 @@ struct debug_menu_entry {
         {
             float v6;
             if ( a4 )
+            {
                 v6 = this->field_20[2] * this->field_20[3];
+            }
             else
+            {
                 v6 = this->field_20[2];
+            }
 
             auto v5 = this->get_fval() + a3 * v6;
             this->set_fval(v5, true);
@@ -92,9 +98,13 @@ struct debug_menu_entry {
 
             auto v4 = this->get_ival();
             if ( a3 >= 0.0 )
+            {
                 this->set_ival((int)(v4 + v8), true);
+            }
             else
+            {
                 this->set_ival((int)(v4 - v8), true);
+            }
 
             break;
         }
@@ -435,7 +445,7 @@ debug_menu* create_menu(const char* title, menu_handler_function function, DWORD
 
 void handle_game_entry(debug_menu_entry *entry, custom_key_type key_type)
 {
-    printf("entry->text = %s\n", entry->text);
+    printf("handle_game_entry = %s, %d\n", entry->text, key_type);
 
     if (key_type == ENTER)
     {
@@ -460,15 +470,12 @@ void handle_game_entry(debug_menu_entry *entry, custom_key_type key_type)
             break;
         }
     }
-    else if (key_type == LEFT || key_type == RIGHT)
+    else if (key_type == LEFT)
     {
-        if (key_type == LEFT)
-        {
-            entry->on_change(-1.0, true);
-        }
-        else if (key_type == RIGHT)
-        {
-            entry->on_change(1.0, true);
-        }
+        entry->on_change(-1.0, false);
+    }
+    else if (key_type == RIGHT)
+    {
+        entry->on_change(1.0, true);
     }
 }
