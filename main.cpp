@@ -135,18 +135,7 @@ debug_menu** all_menus[] = {
 	&progression_menu
 };
 
-debug_menu* current_menu = nullptr;
-
-void goto_start_debug() {
-	current_menu = start_debug;
-}
-
-void goto_game_flags_menu() {
-    current_menu = game_menu;
-}
-
 void unlock_region(region* cur_region) {
-
 	cur_region->status &= 0xFE;
 }
 
@@ -987,7 +976,7 @@ void populate_missions_menu()
 
                 auto v52 = reg->get_district_id();
 
-                auto *v25 = create_menu(v53.to_string(), nullptr, nullptr, 10);
+                auto *v25 = create_menu(v53.to_string(), nullptr, 10);
 
                 debug_menu_entry v26 {v25};
 
@@ -1498,46 +1487,6 @@ void handle_missions_entry(debug_menu_entry* entry)
 	close_debug();
 }
 
-void handle_game_entry(debug_menu_entry *entry, custom_key_type key_type)
-{
-    printf("entry->text = %s\n", entry->text);
-
-    if (key_type == ENTER)
-    {
-        switch(entry->entry_type)
-        {
-        case BOOLEAN_E: 
-        case POINTER_BOOL:
-        {
-            auto v3 = entry->get_bval();
-            entry->set_bval(!v3, true);
-            break;
-        } 
-        case POINTER_MENU:
-        {
-            if (entry->data != nullptr)
-            {
-                current_menu = static_cast<decltype(current_menu)>(entry->data);
-            }
-            return;
-        }
-        default:
-            break;
-        }
-    }
-    else if (key_type == LEFT || key_type == RIGHT)
-    {
-        if (key_type == LEFT)
-        {
-            entry->on_change(-1.0, true);
-        }
-        else if (key_type == RIGHT)
-        {
-            entry->on_change(1.0, true);
-        }
-    }
-}
-
 void handle_warp_entry(debug_menu_entry* entry) {
 	
 	float position[] = {
@@ -2013,7 +1962,7 @@ void create_game_flags_menu(debug_menu *parent)
     v92->add_entry(&v89);
 
     {
-        auto *v88 = create_menu("Save/Load", goto_game_flags_menu, handle_game_entry, 10);
+        auto *v88 = create_menu("Save/Load", handle_game_entry, 10);
         auto v18 = debug_menu_entry(v88);
         v92->add_entry(&v18);
 
@@ -2034,7 +1983,7 @@ void create_game_flags_menu(debug_menu *parent)
     }
 
     {
-        auto *v87 = create_menu("Screenshot", goto_game_flags_menu, handle_game_entry, 10);
+        auto *v87 = create_menu("Screenshot", handle_game_entry, 10);
         auto v23 = debug_menu_entry(v87);
         v92->add_entry(&v23);
 
@@ -2055,15 +2004,15 @@ void create_game_flags_menu(debug_menu *parent)
 
 void setup_debug_menu() {
 
-	start_debug = create_menu("Debug Menu", close_debug, handle_debug_entry, 10);
-	warp_menu = create_menu("Warp", goto_start_debug, (menu_handler_function) handle_warp_entry, 300);
-	game_menu = create_menu("Game", goto_start_debug, handle_game_entry, 300);
-	missions_menu = create_menu("Missions", goto_start_debug, (menu_handler_function) handle_missions_entry, 300);
-	char_select_menu = create_menu("Char Select", goto_start_debug, (menu_handler_function) handle_char_select_entry, 5);
-	options_menu = create_menu("Options", goto_start_debug, handle_options_select_entry, 2);
-	script_menu = create_menu("Script", goto_start_debug, (menu_handler_function) handle_script_select_entry, 50);
-	progression_menu = create_menu("Progression", goto_start_debug, (menu_handler_function) handle_progression_select_entry, 10);
-	district_variants_menu = create_menu("District variants", goto_start_debug, handle_distriction_variants_select_entry, 15);
+	start_debug = create_menu("Debug Menu", handle_debug_entry, 10);
+	warp_menu = create_menu("Warp", (menu_handler_function) handle_warp_entry, 300);
+	game_menu = create_menu("Game", handle_game_entry, 300);
+	missions_menu = create_menu("Missions", (menu_handler_function) handle_missions_entry, 300);
+	char_select_menu = create_menu("Char Select", (menu_handler_function) handle_char_select_entry, 5);
+	options_menu = create_menu("Options", handle_options_select_entry, 2);
+	script_menu = create_menu("Script", (menu_handler_function) handle_script_select_entry, 50);
+	progression_menu = create_menu("Progression", (menu_handler_function) handle_progression_select_entry, 10);
+	district_variants_menu = create_menu("District variants", handle_distriction_variants_select_entry, 15);
 
 	debug_menu_entry warp_entry { warp_menu };
 	debug_menu_entry game_entry { game_menu };

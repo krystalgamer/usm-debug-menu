@@ -2,6 +2,8 @@
 
 #include "mstring.h"
 
+#include <cassert>
+
 constexpr auto EXTEND_NEW_ENTRIES = 20;
 
 constexpr auto MAX_CHARS_SAFE = 63;
@@ -327,9 +329,10 @@ struct debug_menu_entry {
 };
 
 typedef void (*menu_handler_function)(debug_menu_entry*, custom_key_type key_type);
-typedef void (*go_back_function)();
 
 void close_debug();
+
+debug_menu* current_menu = nullptr;
 
 struct debug_menu {
 	char title[MAX_CHARS];
@@ -337,14 +340,25 @@ struct debug_menu {
 	DWORD used_slots;
 	DWORD window_start;
 	DWORD cur_index;
-	go_back_function go_back;
 	menu_handler_function handler;
 	debug_menu_entry* entries;
+    debug_menu *m_parent {nullptr};
 
     void add_entry(debug_menu_entry *entry);
 
     static void hide()
     {
+        close_debug();
+    }
+
+    void go_back()
+    {
+        if (this->m_parent != nullptr)
+        { 
+            current_menu = this->m_parent;
+            return;
+        }
+        
         close_debug();
     }
 
@@ -357,6 +371,14 @@ debug_menu_entry::debug_menu_entry(debug_menu *submenu) : entry_type(POINTER_MEN
 }
 
 void* add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
+
+    if (entry->entry_type == POINTER_MENU)
+    {
+        auto *submenu = (debug_menu *) entry->data;
+        assert(submenu != nullptr);
+
+        submenu->m_parent = menu;
+    }
 
 	if (menu->used_slots < menu->capacity) {
 		void* ret = &menu->entries[menu->used_slots];
@@ -393,7 +415,7 @@ void debug_menu::add_entry(debug_menu_entry *entry)
 }
 
 
-debug_menu* create_menu(const char* title, go_back_function go_back, menu_handler_function function, DWORD capacity) {
+debug_menu* create_menu(const char* title, menu_handler_function function, DWORD capacity) {
 
 	auto *mem = malloc(sizeof(debug_menu));
     debug_menu* menu = static_cast<debug_menu*>(mem);
@@ -403,12 +425,50 @@ debug_menu* create_menu(const char* title, go_back_function go_back, menu_handle
 
 	menu->capacity = capacity;
 	menu->handler = function;
-	menu->go_back = go_back;
-
 	DWORD total_entries_size = sizeof(debug_menu_entry) * capacity;
 	menu->entries = static_cast<decltype(menu->entries)>(malloc(total_entries_size));
 	memset(menu->entries, 0, total_entries_size);
 
 	return menu;
+}
 
+
+void handle_game_entry(debug_menu_entry *entry, custom_key_type key_type)
+{
+    printf("entry->text = %s\n", entry->text);
+
+    if (key_type == ENTER)
+    {
+        switch(entry->entry_type)
+        {
+        case BOOLEAN_E: 
+        case POINTER_BOOL:
+        {
+            auto v3 = entry->get_bval();
+            entry->set_bval(!v3, true);
+            break;
+        } 
+        case POINTER_MENU:
+        {
+            if (entry->data != nullptr)
+            {
+                current_menu = static_cast<decltype(current_menu)>(entry->data);
+            }
+            return;
+        }
+        default:
+            break;
+        }
+    }
+    else if (key_type == LEFT || key_type == RIGHT)
+    {
+        if (key_type == LEFT)
+        {
+            entry->on_change(-1.0, true);
+        }
+        else if (key_type == RIGHT)
+        {
+            entry->on_change(1.0, true);
+        }
+    }
 }
