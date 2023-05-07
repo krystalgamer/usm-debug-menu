@@ -34,6 +34,9 @@
     <ClInclude Include="color.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="color32.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="common.h" />
   </ItemGroup>
   <ItemGroup>
@@ -50,6 +53,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="forwards.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="fetext.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="func_wrapper.h" />

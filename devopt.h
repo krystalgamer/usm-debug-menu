@@ -8,7 +8,7 @@ struct game_option_t
 {
     const char *m_name;
     union {
-        BOOL *p_bval;
+        bool *p_bval;
         int *p_ival;
         float *p_fval;
         mString *p_strval;
@@ -34,9 +34,8 @@ game_option_t *get_option(int idx)
 
     if (idx < 150)
     {
-
         auto &name = flag_names()[idx];
-        BOOL *flag = &flag_defaults()[idx];
+        bool *flag = &os_developer_options::instance()->m_flags[idx];
 
         option.m_name = name;
         option.m_type = game_option_t::FLAG_OPTION;
@@ -47,7 +46,7 @@ game_option_t *get_option(int idx)
 
     idx = idx - 150;
     auto &name = int_names()[idx];
-    auto *i = &int_defaults()[idx];
+    int *i = &os_developer_options::instance()->m_ints[idx];
 
     option.m_name = name;
     option.m_type = game_option_t::INT_OPTION;

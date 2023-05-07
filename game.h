@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fetext.h"
 #include "variable.h"
 #include "common.h"
 #include "os_developer_options.h"
@@ -59,6 +60,15 @@ struct game
     bool field_170;
     bool field_171;
     bool field_172;
+    bool field_173;
+    vector3d field_174;
+    vector3d field_180[10];
+    vector3d field_1F8[10];
+    int field_270;
+    int field_274;
+    int field_278;
+    int field_27C;
+    int field_280;
 
     void enable_physics(bool a2)
     {
@@ -97,6 +107,7 @@ struct game
 };
 
 VALIDATE_OFFSET(game, field_172, 0x172);
+VALIDATE_OFFSET(game, field_280, 0x280);
 
 inline Var<game *> g_game_ptr{0x009682E0};
 
@@ -266,4 +277,25 @@ void game::show_debug_info()
     v13.y += 20;
     auto *v6 = v11.c_str();
     nglListAddString(nglSysFont(), (float)v13.x, (float)v13.y, 1.0, v15, v15, v6);
+}
+
+void render_text(const mString &a1, const vector2di &a2, color32 a3, float a4, float a5)
+{
+    if ( os_developer_options::instance()->get_flag(mString{"SHOW_DEBUG_TEXT"}) )
+    {
+        FEText fe_text{font_index{0},
+                       global_text_enum{0},
+                       (float) a2.x,
+                       (float) a2.y,
+                       (int) a4,
+                       panel_layer{0},
+                       a5,
+                       16,
+                       0,
+                       a3};
+
+        fe_text.field_1C = a1;
+
+        fe_text.Draw();
+    }
 }
