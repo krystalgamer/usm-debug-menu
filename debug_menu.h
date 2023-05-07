@@ -42,7 +42,7 @@ struct debug_menu_entry {
 	custom_string_generator_ptr custom_string_generator;
     void (*m_game_flags_handler)(debug_menu_entry *) = nullptr;
     float field_20[4] = {0.f, 1.f, 0.1f, 10.f};
-    bool m_value_initialized;
+    bool m_value_initialized{false};
 
     void set_id(int id)
     {
@@ -442,10 +442,45 @@ debug_menu* create_menu(const char* title, menu_handler_function function, DWORD
 	return menu;
 }
 
+const char *to_string(custom_key_type key_type)
+{
+    if (key_type == ENTER)
+    {
+        return "ENTER";
+    }
+    else if (key_type == LEFT)
+    {
+        return "LEFT";
+    }
+    else if (key_type == RIGHT)
+    {
+        return "RIGHT";
+    }
+
+    return "";
+}
+
+const char *to_string(debug_menu_entry_type entry_type)
+{
+    if (entry_type == POINTER_BOOL)
+    {
+        return "POINTER_BOOL";
+    }
+    else if (entry_type == BOOLEAN_E)
+    {
+        return "BOOL";
+    }
+    else if (entry_type == POINTER_MENU)
+    {
+        return "POINTER_MENU";
+    }
+
+    return "";
+}
 
 void handle_game_entry(debug_menu_entry *entry, custom_key_type key_type)
 {
-    printf("handle_game_entry = %s, %d\n", entry->text, key_type);
+    printf("handle_game_entry = %s, %s, entry_type = %s\n", entry->text, to_string(key_type), to_string(entry->entry_type));
 
     if (key_type == ENTER)
     {

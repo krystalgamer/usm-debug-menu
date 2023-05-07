@@ -11,12 +11,14 @@ struct mString
 
     mString()
     {
-        THISCALL(0x00420F00, this);
+        void (__fastcall *func)(void *) = bit_cast<decltype(func)>(0x00420F00);
+        func(this);
     }
 
     mString(const mString &a2)
     {
-        THISCALL(0x00421220, this, &a2);
+        void (__fastcall *func)(void *, int, const mString *) = bit_cast<decltype(func)>(0x00421220);
+        func(this, 0, &a2);
     }
 
     mString(int , const char *Format, ...)
@@ -79,7 +81,8 @@ struct mString
 
     void append(const char *from_string, size_t Count)
     {
-        THISCALL(0x0041FAB0, this, from_string, Count);
+        void (__fastcall *func)(void *, int, const char *, unsigned int) = bit_cast<decltype(func)>(0x0041FAB0);
+        func(this, 0, from_string, Count);
     }
 
     mString &operator+=(const mString &a1)

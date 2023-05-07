@@ -1,5 +1,7 @@
 #pragma once
 
+#include "bit.h"
+
 struct string_hash
 {
     unsigned int source_hash_code;
@@ -8,7 +10,8 @@ struct string_hash
 
     string_hash(const char *a1)
     {
-        THISCALL(0x00401960, this, a1);
+        void (__fastcall *func)(void *, int idx, const char *) = bit_cast<decltype(func)>(0x00401960);
+        func(this, 0, a1);
     }
 
     const char *to_string()

@@ -39,10 +39,6 @@
 DWORD* ai_current_player = nullptr;
 DWORD* fancy_player_ptr = nullptr;
 
-char* injected_pack = nullptr;
-
-DWORD for_pack_loading[2];
-
 /*
 #undef IsEqualGUID
 BOOL WINAPI IsEqualGUID(

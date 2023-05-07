@@ -16,7 +16,8 @@ struct actor
 
     physical_interface *physical_ifc()
     {
-        return (physical_interface *) THISCALL(0x004B8B40, this);
+        physical_interface * (__fastcall *func)(void *) = bit_cast<decltype(func)>(0x004B8B40);
+        return func(this);
     }
 };
 

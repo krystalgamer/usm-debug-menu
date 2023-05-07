@@ -29,17 +29,20 @@ struct entity
 
     region * get_primary_region()
     {
-        return (region *) THISCALL(0x004C0760, this);
+        region *(__fastcall *func)(void *) = bit_cast<decltype(func)>(0x004C0760);
+        return func(this);
     }
 
     vector3d *get_abs_position()
     {
-        return (vector3d *) THISCALL(0x0048AC00, this);
+        vector3d * (__fastcall *func)(void *) = bit_cast<decltype(func)>(0x0048AC00);
+        return func(this);
     }
 
     po *get_abs_po()
     {
-        return (po *) THISCALL(0x0048AC20, this);
+        po * (__fastcall *func)(void *) = bit_cast<decltype(func)>(0x0048AC20);
+        return func(this);
     }
 };
 

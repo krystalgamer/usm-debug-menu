@@ -49,12 +49,16 @@ struct FEText
            int a10,
            color32 a11)
     {
-        THISCALL(0x00617500, this, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
+        void (__fastcall *func)(void *, void *, font_index, global_text_enum, Float, Float,
+                int, panel_layer, Float, int, int, color32) = bit_cast<decltype(func)>(0x00617500);
+
+        func(this, 0, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11);
     }
 
     void Draw()
     {
-        THISCALL(0x00617640, this);
+        void (__fastcall *func)(void *) = bit_cast<decltype(func)>(0x00617640);
+        func(this);
     }
 };
 
