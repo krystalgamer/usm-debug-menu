@@ -10,6 +10,7 @@ constexpr auto MAX_CHARS_SAFE = 63;
 constexpr auto MAX_CHARS = MAX_CHARS_SAFE + 1;
 
 enum debug_menu_entry_type {
+    UNDEFINED,
     NORMAL,
     FLOAT_E,
     POINTER_FLOAT,
@@ -52,6 +53,12 @@ struct debug_menu_entry {
     auto get_id() const
     {
         return m_id;
+    }
+
+    void set_submenu(debug_menu *submenu)
+    {
+        this->entry_type = POINTER_MENU;
+        this->data = submenu;
     }
 
     void on_change(float a3, bool a4)
@@ -424,9 +431,8 @@ void debug_menu::add_entry(debug_menu_entry *entry)
     add_debug_menu_entry(this, entry);
 }
 
-
-debug_menu* create_menu(const char* title, menu_handler_function function, DWORD capacity) {
-
+debug_menu* create_menu(const char* title, menu_handler_function function, DWORD capacity)
+{
 	auto *mem = malloc(sizeof(debug_menu));
     debug_menu* menu = static_cast<debug_menu*>(mem);
 	memset(menu, 0, sizeof(debug_menu));
@@ -486,6 +492,14 @@ void handle_game_entry(debug_menu_entry *entry, custom_key_type key_type)
     {
         switch(entry->entry_type)
         {
+        case UNDEFINED:
+        {    
+            if ( entry->m_game_flags_handler != nullptr )
+            {
+                entry->m_game_flags_handler(entry);
+            }
+            break;
+        }
         case BOOLEAN_E: 
         case POINTER_BOOL:
         {

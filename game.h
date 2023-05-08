@@ -26,6 +26,8 @@ struct game_process
 
 inline Var<game_process> lores_game_process{0x00922074};
 
+struct game_settings;
+
 struct game
 {
     char field_0[0x5C];
@@ -45,7 +47,9 @@ struct game
         }
     } process_stack;
 
-    int field_7C[59];
+    int field_7C[17];
+    game_settings *gamefile;
+    int field_C4[41];
 
     struct {
         bool level_is_loaded;
@@ -69,6 +73,12 @@ struct game
     int field_278;
     int field_27C;
     int field_280;
+
+    game_settings *get_game_settings() {
+        assert(gamefile != nullptr);
+
+        return this->gamefile;
+    }
 
     void enable_physics(bool a2)
     {
@@ -106,6 +116,7 @@ struct game
     void show_debug_info();
 };
 
+VALIDATE_OFFSET(game, gamefile, 0xC0);
 VALIDATE_OFFSET(game, field_172, 0x172);
 VALIDATE_OFFSET(game, field_280, 0x280);
 
@@ -119,7 +130,6 @@ mString sub_55DD80(const vector3d &a2)
 
 mString game::get_camera_info()
 {
-    auto *v34 = this;
     auto *v2 = this->field_5C;
 
     mString v22;

@@ -43,6 +43,9 @@
     <ClInclude Include="debug_menu.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="debug_menu_extra.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="devopt.h" />
   </ItemGroup>
   <ItemGroup>
@@ -62,6 +65,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="game_settings.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="geometry_manager.h" />

@@ -35,6 +35,7 @@
 #include "geometry_manager.h"
 #include "entity.h"
 #include "terrain.h"
+#include "debug_menu_extra.h"
 
 DWORD* ai_current_player = nullptr;
 DWORD* fancy_player_ptr = nullptr;
@@ -1653,9 +1654,6 @@ void create_devopt_menu(debug_menu *parent)
     auto v5 = debug_menu_entry(v22);
     parent->add_entry(&v5);
 }
-
-void create_gamefile_menu(debug_menu *)
-{}
 
 namespace spider_monkey {
     bool is_running()
