@@ -25,6 +25,7 @@
 #include "variable.h"
 #include "func_wrapper.h"
 #include "fixedstring32.h"
+#include "levelmenu.h"
 #include "mission_manager.h"
 #include "mission_table_container.h"
 #include "mstring.h"
@@ -120,6 +121,7 @@ debug_menu* char_select_menu = nullptr;
 debug_menu* options_menu = nullptr;
 debug_menu* script_menu = nullptr;
 debug_menu* progression_menu = nullptr;
+debug_menu* level_select_menu = nullptr;
 
 debug_menu** all_menus[] = {
 	&start_debug,
@@ -130,7 +132,8 @@ debug_menu** all_menus[] = {
 	&char_select_menu,
 	&options_menu,
 	&script_menu,
-	&progression_menu
+	&progression_menu,
+    &level_select_menu
 };
 
 void unlock_region(region* cur_region) {
@@ -1059,6 +1062,12 @@ void menu_setup(int game_state, int keyboard) {
 		populate_missions_menu();
 
         create_game_flags_menu(game_menu);
+
+
+        if (level_select_menu->used_slots == 0)
+        {
+            create_level_select_menu();
+        }
 
 		if (options_menu->used_slots == 2) {
 			BYTE* arr = (BYTE *) *(DWORD*)0x96858C;
@@ -2049,6 +2058,7 @@ void setup_debug_menu() {
 	script_menu = create_menu("Script", (menu_handler_function) handle_script_select_entry, 50);
 	progression_menu = create_menu("Progression", (menu_handler_function) handle_progression_select_entry, 10);
 	district_variants_menu = create_menu("District variants", handle_distriction_variants_select_entry, 15);
+    level_select_menu = create_menu("Level Select", (menu_handler_function) handle_level_select_entry, 10);
 
 	debug_menu_entry warp_entry { warp_menu };
 	debug_menu_entry game_entry { game_menu };
@@ -2058,6 +2068,7 @@ void setup_debug_menu() {
 	debug_menu_entry script_entry { script_menu };
 	debug_menu_entry progression_entry { progression_menu };
 	debug_menu_entry district_entry { district_variants_menu };
+	debug_menu_entry level_select_entry { level_select_menu };
 
 	add_debug_menu_entry(start_debug, &warp_entry);
 	add_debug_menu_entry(start_debug, &game_entry);
@@ -2067,6 +2078,7 @@ void setup_debug_menu() {
 	add_debug_menu_entry(start_debug, &options_entry);
 	add_debug_menu_entry(start_debug, &script_entry);
 	add_debug_menu_entry(start_debug, &progression_entry);
+	add_debug_menu_entry(start_debug, &level_select_entry);
 
 	const char* costumes[] = {
 		"ultimate_spiderman",

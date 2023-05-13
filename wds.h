@@ -22,6 +22,21 @@ struct world_dynamics_system
         auto *result = this->field_230[index];
         return result;
     }
+
+    void remove_player(int player_num)
+    {
+        void (__fastcall *func)(void *, void *, int) = bit_cast<decltype(func)>(0x00558550);
+
+        func(this, nullptr, player_num);
+    }
+
+    int add_player(const mString &a2)
+    {
+        int (__fastcall *func)(void *, void *, const mString *) = bit_cast<decltype(func)>(0x0055B400);
+
+        return func(this, nullptr, &a2);
+    }
+
 };
 
 VALIDATE_OFFSET(world_dynamics_system, field_230, 0x230);

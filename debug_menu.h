@@ -42,6 +42,7 @@ struct debug_menu_entry {
     uint16_t m_id {0};
 	custom_string_generator_ptr custom_string_generator;
     void (*m_game_flags_handler)(debug_menu_entry *) = nullptr;
+    void (*frame_advance_callback)(debug_menu_entry *) = nullptr;
     float field_20[4] = {0.f, 1.f, 0.1f, 10.f};
     bool m_value_initialized{false};
 
@@ -53,6 +54,11 @@ struct debug_menu_entry {
     auto get_id() const
     {
         return m_id;
+    }
+
+    void set_frame_advance_cb(void (*a2)(debug_menu_entry *))
+    {
+        this->frame_advance_callback = a2;
     }
 
     void set_submenu(debug_menu *submenu)

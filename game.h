@@ -86,6 +86,13 @@ struct game
         func(this, 0, a2);
     }
 
+    void enable_marky_cam(bool a2, bool a3, Float a4, Float a5)
+    {
+        void (__fastcall *func)(void *, void *, bool, bool, Float, Float) = bit_cast<decltype(func)>(0x005241E0);
+
+        func(this, nullptr, a2, a3, a4, a5);
+    }
+
     void push_process(game_process &process) {
         void (__fastcall *sub_570FD0)(void *, int, void *) = (decltype(sub_570FD0)) 0x00570FD0;
 
@@ -99,6 +106,13 @@ struct game
     void push_lores()
     {
         this->push_process(lores_game_process());
+    }
+
+    void load_new_level(const mString &a1, int a2)
+    {
+        void (__fastcall *func)(void *, void *, const mString *, int) = bit_cast<decltype(func)>(0x00514C70);
+
+        func(this, nullptr, &a1, a2);
     }
 
     void begin_hires_screenshot(int a2, int a3)

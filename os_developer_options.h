@@ -4,11 +4,40 @@
 #include "func_wrapper.h"
 #include "mstring.h"
 
+#include <optional>
+
 struct os_developer_options
 {
+    enum strings_t {
+        SOUND_LIST = 0,
+        SCENE_NAME = 1,
+        HERO_NAME = 2,
+        GAME_TITLE = 3,
+        GAME_LONG_TITLE = 4,
+        SAVE_GAME_DESC = 5,
+        VIDEO_MODE = 6,
+        GFX_DEVICE = 7,
+        FORCE_DEBUG_MISSION = 8,
+        FORCE_LANGUAGE = 9,
+        SKU = 10,
+        CONSOLE_EXEC = 11,
+        HERO_START_DISTRICT = 12,
+        DEBUG_ENTITY_NAME = 13,
+    };
+
     bool m_flags[150];
     mString m_strings[14];
     int m_ints[76];
+
+    std::optional<mString> get_string(strings_t a2)
+    {
+        if (a2 < strings_t::SOUND_LIST || a2 > strings_t::DEBUG_ENTITY_NAME) {
+            return {};
+        } else {
+            auto a3 = this->m_strings[a2];
+            return a3;
+        }
+    }
 
     int get_int(const mString &a2)
     {
