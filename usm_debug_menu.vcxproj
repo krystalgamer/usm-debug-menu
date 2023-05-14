@@ -52,6 +52,15 @@
     <ClInclude Include="entity.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="fe_health_widget.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="femanager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="fixedstring.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="fixedstring32.h" />
   </ItemGroup>
   <ItemGroup>
@@ -73,7 +82,13 @@
     <ClInclude Include="geometry_manager.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="igofrontend.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="input_mgr.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="levelmenu.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="mashable_vector.h" />
@@ -104,6 +119,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource_manager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource_partition.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="spider_monkey.h" />
