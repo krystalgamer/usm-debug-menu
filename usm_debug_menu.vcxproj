@@ -118,7 +118,19 @@
     <ClInclude Include="resource_key.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="resource_directory.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="resource_manager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource_pack_directory.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource_pack_location.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource_pack_slot.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource_partition.h" />
