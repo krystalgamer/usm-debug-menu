@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "func_wrapper.h"
+#include "bit.h"
 
 struct resource_key;
 struct resource_pack_slot;
@@ -11,7 +11,7 @@ struct resource_directory
 {
     uint8_t *get_resource(const resource_key &resource_id, int *a3, resource_pack_slot **a4)
     {
-        auto func = bit_cast<fastcall_call>(0x0052AA70);
-        return (uint8_t *) func(this, 0, &resource_id, a3, a4);
+        uint8_t * (__fastcall *func)(void *, void *, const resource_key *, int *, resource_pack_slot **) = bit_cast<decltype(func)>(0x0052AA70);
+        return func(this, 0, &resource_id, a3, a4);
     }
 };
