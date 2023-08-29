@@ -18,6 +18,7 @@
 #pragma comment(lib, "Dxguid.lib")
 
 #include "devopt.h"
+#include "entity_animation_menu.h"
 #include "game.h"
 #include "input_mgr.h"
 #include "resource_manager.h"
@@ -649,7 +650,7 @@ uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
 
 	debug_menu_entry entry;
 	memset(&entry, 0, sizeof(entry));
-	entry.entry_type = NORMAL;
+	entry.entry_type = UNDEFINED;
 	entry.data = instance;
 	entry.data1 = (void *) functionid;
 
@@ -677,7 +678,7 @@ uint8_t __stdcall slf__create_debug_menu_entry(slf* function, void* unk) {
 
 	debug_menu_entry entry;
 	memset(&entry, 0, sizeof(entry));
-	entry.entry_type = NORMAL;
+	entry.entry_type = UNDEFINED;
 	strcpy(entry.text, strs[0]);
 
 	void *res = add_debug_menu_entry(script_menu, &entry);
@@ -880,7 +881,7 @@ void setup_warp_menu()
 			region* cur_region = &(*all_regions)[i];
 			auto *region_name = region_get_name(cur_region);
 
-			debug_menu_entry warp_entry = { "", NORMAL, cur_region };
+			debug_menu_entry warp_entry = { "", UNDEFINED, cur_region };
 			warp_entry.data1 = 0;
 			strcpy(warp_entry.text, region_name);
 			add_debug_menu_entry(warp_menu, &warp_entry);
@@ -1113,7 +1114,9 @@ void menu_input_handler(int keyboard, int SCROLL_SPEED) {
     {
         auto *entry = &current_menu->entries[current_menu->window_start + current_menu->cur_index];
         assert(entry != nullptr);
-		current_menu->handler(entry, ENTER);
+        entry->on_select(1.0);
+
+		//current_menu->handler(entry, ENTER);
 	}
 	else if (is_menu_key_pressed(MENU_BACK, keyboard)) {
 		current_menu->go_back();
@@ -1125,7 +1128,13 @@ void menu_input_handler(int keyboard, int SCROLL_SPEED) {
                 cur->entry_type == POINTER_INT ||
                 cur->entry_type == INTEGER ||
                 cur->entry_type == CUSTOM)
-			current_menu->handler(cur, (is_menu_key_pressed(MENU_LEFT, keyboard) ? LEFT : RIGHT));
+			//current_menu->handler(cur, (is_menu_key_pressed(MENU_LEFT, keyboard) ? LEFT : RIGHT));
+
+            if (is_menu_key_pressed(MENU_LEFT, keyboard)) {
+                cur->on_change(-1.0, false);
+            } else {
+                cur->on_change(1.0, true);
+            }
 	}
 }
 
@@ -2079,6 +2088,8 @@ void debug_menu::init() {
 	add_debug_menu_entry(root_menu, &progression_entry);
 	add_debug_menu_entry(root_menu, &level_select_entry);
 
+    create_entity_animation_menu(root_menu);
+
 	const char* costumes[] = {
 		"ultimate_spiderman",
 		"arachno_man_costume",
@@ -2095,7 +2106,7 @@ void debug_menu::init() {
 
 	for (auto i = 0u; i < sizeof(costumes) / sizeof(char*); ++i) {
 		debug_menu_entry char_entry;
-		char_entry.entry_type = NORMAL;
+		char_entry.entry_type = UNDEFINED;
 		strcpy(char_entry.text, costumes[i]);
 
 		add_debug_menu_entry(char_select_menu, &char_entry);

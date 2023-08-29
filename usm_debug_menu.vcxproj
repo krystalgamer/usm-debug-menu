@@ -28,6 +28,9 @@
     <ClInclude Include="ai_player_controller.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="animation_controller.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="bit.h" />
   </ItemGroup>
   <ItemGroup>
@@ -50,6 +53,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="entity.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="entity_animation_menu.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="fe_health_widget.h" />
@@ -91,6 +97,9 @@
     <ClInclude Include="levelmenu.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="list.hpp" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="mashable_vector.h" />
   </ItemGroup>
   <ItemGroup>
@@ -104,6 +113,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="mstring.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="nal_system.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="os_developer_options.h" />
@@ -140,6 +152,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="terrain.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="tlresource_location.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utility.h" />

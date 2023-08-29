@@ -14,9 +14,9 @@ struct string_hash
         func(this, 0, a1);
     }
 
-    const char *to_string()
+    const char *to_string() const
     {
-        const char * (__fastcall *func)(void *) = (decltype(func)) 0x005374B0;
+        const char * (__fastcall *func)(const void *) = (decltype(func)) 0x005374B0;
         return func(this);
     }
 

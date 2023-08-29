@@ -11,7 +11,6 @@ constexpr auto MAX_CHARS = MAX_CHARS_SAFE + 1;
 
 enum debug_menu_entry_type {
     UNDEFINED,
-    NORMAL,
     FLOAT_E,
     POINTER_FLOAT,
     INTEGER,
@@ -21,6 +20,29 @@ enum debug_menu_entry_type {
     POINTER_MENU,
 	CUSTOM
 };
+
+const char *to_string(debug_menu_entry_type entry_type)
+{
+    if (entry_type == POINTER_BOOL)
+    {
+        return "POINTER_BOOL";
+    }
+    else if (entry_type == BOOLEAN_E)
+    {
+        return "BOOL";
+    }
+    else if (entry_type == POINTER_MENU)
+    {
+        return "POINTER_MENU";
+    }
+    else if (entry_type == UNDEFINED)
+    {
+        return "UNDEFINED";
+    }
+
+    return "";
+}
+
 
 enum custom_key_type {
 	LEFT,
@@ -62,6 +84,10 @@ struct debug_menu_entry {
     }
 
     void set_submenu(debug_menu *submenu);
+
+    void on_select(float a2);
+
+    debug_menu *remove_menu();
 
     void on_change(float a3, bool a4)
     {
@@ -328,12 +354,12 @@ struct debug_menu_entry {
 
     debug_menu_entry() = default;
 
-    debug_menu_entry(const char *p_text) : entry_type(NORMAL), data(nullptr)
+    debug_menu_entry(const char *p_text) : entry_type(UNDEFINED), data(nullptr)
     {
         strncpy(this->text, p_text, MAX_CHARS_SAFE);
     }
 
-    debug_menu_entry(const mString &p_text) : entry_type(NORMAL), data(nullptr)
+    debug_menu_entry(const mString &p_text) : entry_type(UNDEFINED), data(nullptr)
     {
         strncpy(this->text, p_text.c_str(), MAX_CHARS_SAFE);
     }
@@ -387,6 +413,52 @@ struct debug_menu {
 
     static inline bool physics_state_on_exit = true;
 };
+
+debug_menu *debug_menu_entry::remove_menu()
+{
+    if ( this->m_game_flags_handler != nullptr )
+    {
+        if ( this->data != nullptr )
+        {
+            static_cast<debug_menu *>(this->data)->~debug_menu();
+        }
+
+        this->data = nullptr;
+        this->m_game_flags_handler(this);
+    }
+
+    return (debug_menu *) this->data;
+}
+
+void debug_menu_entry::on_select(float a2)
+{
+    printf("debug_menu_entry::on_select: text = %s, entry_type = %s\n", this->text, to_string(this->entry_type));
+
+    switch ( this->entry_type )
+    {
+    case UNDEFINED:
+        if ( this->m_game_flags_handler != nullptr )
+        {
+            this->m_game_flags_handler(this);
+        }
+
+        break;
+    case BOOLEAN_E:
+    case POINTER_BOOL:
+        this->on_change(a2, false);
+        break;
+    case POINTER_MENU:
+        this->remove_menu();
+        if ( this->data != nullptr )
+        {
+            current_menu = static_cast<debug_menu *>(this->data);
+        }
+
+        break;
+    default:
+        return;
+    }
+}
 
 void debug_menu_entry::set_submenu(debug_menu *submenu)
 {
@@ -464,6 +536,23 @@ debug_menu* create_menu(const char* title, menu_handler_function function, DWORD
 	return menu;
 }
 
+debug_menu* create_menu(const char* title)
+{
+    const auto capacity = 100u;
+	auto *mem = malloc(sizeof(debug_menu));
+    debug_menu* menu = static_cast<debug_menu*>(mem);
+	memset(menu, 0, sizeof(debug_menu));
+
+	strncpy(menu->title, title, MAX_CHARS_SAFE);
+
+	menu->capacity = capacity;
+	DWORD total_entries_size = sizeof(debug_menu_entry) * capacity;
+	menu->entries = static_cast<decltype(menu->entries)>(malloc(total_entries_size));
+	memset(menu->entries, 0, total_entries_size);
+
+	return menu;
+}
+
 const char *to_string(custom_key_type key_type)
 {
     if (key_type == ENTER)
@@ -477,24 +566,6 @@ const char *to_string(custom_key_type key_type)
     else if (key_type == RIGHT)
     {
         return "RIGHT";
-    }
-
-    return "";
-}
-
-const char *to_string(debug_menu_entry_type entry_type)
-{
-    if (entry_type == POINTER_BOOL)
-    {
-        return "POINTER_BOOL";
-    }
-    else if (entry_type == BOOLEAN_E)
-    {
-        return "BOOL";
-    }
-    else if (entry_type == POINTER_MENU)
-    {
-        return "POINTER_MENU";
     }
 
     return "";

@@ -46,3 +46,16 @@ struct fixedstring
     }
 
 };
+
+struct tlFixedString {
+    uint32_t m_hash;
+    char field_4[28];
+
+    auto GetHash() const {
+        return this->m_hash;
+    }
+
+    const char *to_string() const {
+        return field_4;
+    }
+};
