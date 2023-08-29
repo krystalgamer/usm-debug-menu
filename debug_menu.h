@@ -61,11 +61,7 @@ struct debug_menu_entry {
         this->frame_advance_callback = a2;
     }
 
-    void set_submenu(debug_menu *submenu)
-    {
-        this->entry_type = POINTER_MENU;
-        this->data = submenu;
-    }
+    void set_submenu(debug_menu *submenu);
 
     void on_change(float a3, bool a4)
     {
@@ -385,8 +381,22 @@ struct debug_menu {
         close_debug();
     }
 
+    static void init();
+
+    static inline debug_menu *root_menu = nullptr;
+
     static inline bool physics_state_on_exit = true;
 };
+
+void debug_menu_entry::set_submenu(debug_menu *submenu)
+{
+    this->entry_type = POINTER_MENU;
+    this->data = submenu;
+
+    if (submenu != nullptr) {
+        submenu->m_parent = current_menu;
+    }
+}
 
 debug_menu_entry::debug_menu_entry(debug_menu *submenu) : entry_type(POINTER_MENU), data(submenu)
 {
@@ -397,10 +407,10 @@ void* add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 
     if (entry->entry_type == POINTER_MENU)
     {
-        auto *submenu = (debug_menu *) entry->data;
-        assert(submenu != nullptr);
-
-        submenu->m_parent = menu;
+        auto *submenu = static_cast<debug_menu *>(entry->data);
+        if (submenu != nullptr) {
+            submenu->m_parent = menu;
+        }
     }
 
 	if (menu->used_slots < menu->capacity) {

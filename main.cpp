@@ -112,7 +112,6 @@ typedef struct _list{
 
 static constexpr DWORD MAX_ELEMENTS_PAGE = 18;
 
-debug_menu* start_debug = nullptr;
 debug_menu* warp_menu = nullptr;
 debug_menu* game_menu = nullptr;
 debug_menu* missions_menu = nullptr;
@@ -124,7 +123,7 @@ debug_menu* progression_menu = nullptr;
 debug_menu* level_select_menu = nullptr;
 
 debug_menu** all_menus[] = {
-	&start_debug,
+	&debug_menu::root_menu,
 	&warp_menu,
     &game_menu,
 	&missions_menu,
@@ -1054,7 +1053,7 @@ void menu_setup(int game_state, int keyboard) {
 		else if (!debug_enabled && game_state == 6) {
 			game_pause(g_game_ptr());
 			debug_enabled = !debug_enabled;
-			current_menu = start_debug;
+			current_menu = debug_menu::root_menu;
 		}
 
 		setup_warp_menu();
@@ -2047,9 +2046,9 @@ void create_game_flags_menu(debug_menu *parent)
     create_gamefile_menu(v92);
 }
 
-void setup_debug_menu() {
+void debug_menu::init() {
 
-	start_debug = create_menu("Debug Menu", handle_debug_entry, 10);
+	root_menu = create_menu("Debug Menu", handle_debug_entry, 10);
 	warp_menu = create_menu("Warp", (menu_handler_function) handle_warp_entry, 300);
 	game_menu = create_menu("Game", handle_game_entry, 300);
 	missions_menu = create_menu("Missions", (menu_handler_function) handle_missions_entry, 300);
@@ -2070,15 +2069,15 @@ void setup_debug_menu() {
 	debug_menu_entry district_entry { district_variants_menu };
 	debug_menu_entry level_select_entry { level_select_menu };
 
-	add_debug_menu_entry(start_debug, &warp_entry);
-	add_debug_menu_entry(start_debug, &game_entry);
-	add_debug_menu_entry(start_debug, &missions_entry);
-	add_debug_menu_entry(start_debug, &district_entry);
-	add_debug_menu_entry(start_debug, &char_select);
-	add_debug_menu_entry(start_debug, &options_entry);
-	add_debug_menu_entry(start_debug, &script_entry);
-	add_debug_menu_entry(start_debug, &progression_entry);
-	add_debug_menu_entry(start_debug, &level_select_entry);
+	add_debug_menu_entry(root_menu, &warp_entry);
+	add_debug_menu_entry(root_menu, &game_entry);
+	add_debug_menu_entry(root_menu, &missions_entry);
+	add_debug_menu_entry(root_menu, &district_entry);
+	add_debug_menu_entry(root_menu, &char_select);
+	add_debug_menu_entry(root_menu, &options_entry);
+	add_debug_menu_entry(root_menu, &script_entry);
+	add_debug_menu_entry(root_menu, &progression_entry);
+	add_debug_menu_entry(root_menu, &level_select_entry);
 
 	const char* costumes[] = {
 		"ultimate_spiderman",
@@ -2115,9 +2114,9 @@ void setup_debug_menu() {
 		sprintf(asdf.text, "entry %d", i);
 		printf("AQUI %s\n", asdf.text);
 
-		add_debug_menu_entry(start_debug, &asdf);
+		add_debug_menu_entry(debug_menu::root_menu, &asdf);
 	}
-	add_debug_menu_entry(start_debug, &teste);
+	add_debug_menu_entry(debug_menu::root_menu, &teste);
 	*/
 }
 
@@ -2129,14 +2128,16 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID reserverd) {
 
 	memset(keys, 0, sizeof(keys));
 	if (fdwReason == DLL_PROCESS_ATTACH) {
+#if 0
 		AllocConsole();
 
 		if (!freopen("CONOUT$", "w", stdout)) {
 			MessageBoxA(NULL, "Error", "Couldn't allocate console...Closing", 0);
 			return FALSE;
 		}
+#endif
 
-		setup_debug_menu();
+        debug_menu::init();
 		set_text_writeable();
 		set_rdata_writeable();
 		install_patches();
