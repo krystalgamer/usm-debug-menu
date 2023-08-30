@@ -25,8 +25,18 @@ struct region {
 	uint8_t variants;
 	uint8_t unk4[0x6B];
 
-    auto &get_name() {
+    fixedstring32 &get_name() {
         return this->mash_info->field_0;
+    }
+
+    int get_district_variant_count() const
+    {
+        return bit_cast<int *>(bit_cast<char *>(this) + 0xC8)[0];
+    }
+
+    int get_district_variant() {
+        int (__fastcall *func)(void *) = bit_cast<decltype(func)>(0x005503D0);
+        return func(this);
     }
 
     int get_district_id() {

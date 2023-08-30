@@ -3,6 +3,81 @@
 #include "debug_menu.h"
 #include "game_settings.h"
 
+void district_variants_handler(debug_menu_entry *entry)
+{
+    auto *the_terrain = g_world_ptr()->the_terrain;
+    if ( the_terrain != nullptr )
+    {
+        auto idx = entry->get_id();
+        auto *reg = the_terrain->get_region(idx);
+        auto ival = entry->get_ival();
+        auto district_id = reg->get_district_id();
+        the_terrain->set_district_variant(district_id, ival, true);
+    }
+}
+
+std::string district_variants_render_callback(debug_menu_entry *a2)
+{
+    if ( a2 != nullptr && g_world_ptr()->the_terrain != nullptr )
+    {
+        auto *the_terrain = g_world_ptr()->the_terrain;
+        auto idx = a2->get_id();
+        auto *reg = the_terrain->get_region(idx);
+        auto v4 = reg->get_district_variant_count() - 1;
+        auto district_variant = reg->get_district_variant();
+
+        char str[100]{};
+        snprintf(str, 100, "%d [0, %d]", district_variant, v4);
+        return {str};
+    }
+    else
+    {
+        auto a1 = entry_render_callback_default(a2);
+        return a1;
+    }
+}
+
+void populate_district_variants_menu(debug_menu_entry *entry)
+{
+    printf("populate_district_variants_menu\n");
+    auto *v5 = create_menu(entry->text);
+    entry->set_submenu(v5);
+    auto *the_terrain = g_world_ptr()->the_terrain;
+    if ( the_terrain != nullptr )
+    {
+        auto num_regions = the_terrain->get_num_regions();
+        for ( auto idx = 0; idx < num_regions; ++idx )
+        {
+            auto *reg = the_terrain->get_region(idx);
+            auto district_variant = reg->get_district_variant();
+            auto district_variant_count = reg->get_district_variant_count();
+            if ( district_variant_count > 1 )
+            {
+                auto &name = reg->get_name();
+                auto *v4 = name.to_string();
+                debug_menu_entry v11 {mString {v4}};
+
+                v11.set_id(idx);
+                v11.set_render_cb(district_variants_render_callback);
+                v11.set_ival(district_variant);
+                v11.set_min_value(0.0);
+                v11.set_max_value((float)(district_variant_count - 1));
+                v11.set_game_flags_handler(district_variants_handler);
+                v5->add_entry(&v11);
+            }
+        }
+    }
+}
+
+void create_debug_district_variants_menu(debug_menu *parent)
+{
+    debug_menu_entry v5 {mString {"District variants"}};
+
+    v5.set_submenu(nullptr);
+    v5.set_game_flags_handler(populate_district_variants_menu);
+    parent->add_entry(&v5);
+}
+
 void populate_gamefile_menu(debug_menu_entry *entry)
 {
     auto &v1 = entry->text;

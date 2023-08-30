@@ -10,7 +10,7 @@ constexpr auto MAX_CHARS_SAFE = 63;
 constexpr auto MAX_CHARS = MAX_CHARS_SAFE + 1;
 
 enum debug_menu_entry_type {
-    UNDEFINED,
+    UNDEFINED = 0,
     FLOAT_E,
     POINTER_FLOAT,
     INTEGER,
@@ -18,29 +18,22 @@ enum debug_menu_entry_type {
     BOOLEAN_E,
     POINTER_BOOL,
     POINTER_MENU,
-	CUSTOM
 };
 
 const char *to_string(debug_menu_entry_type entry_type)
 {
-    if (entry_type == POINTER_BOOL)
-    {
-        return "POINTER_BOOL";
-    }
-    else if (entry_type == BOOLEAN_E)
-    {
-        return "BOOL";
-    }
-    else if (entry_type == POINTER_MENU)
-    {
-        return "POINTER_MENU";
-    }
-    else if (entry_type == UNDEFINED)
-    {
-        return "UNDEFINED";
-    }
+    const char *strings[] = {
+        "UNDEFINED",
+        "FLOAT_E",
+        "POINTER_FLOAT",
+        "INTEGER",
+        "POINTER_INT",
+        "BOOLEAN_E",
+        "POINTER_BOOL",
+        "POINTER_MENU"
+    };
 
-    return "";
+    return strings[entry_type];
 }
 
 
@@ -51,23 +44,20 @@ enum custom_key_type {
 };
 
 struct debug_menu_entry;
-typedef char* (*custom_string_generator_ptr)(debug_menu_entry* entry);
 
-void entry_frame_advance_callback_default(debug_menu_entry *a1)
-{
-  ;
-}
+void entry_frame_advance_callback_default(debug_menu_entry *a1) {}
 
 struct debug_menu;
 
-struct debug_menu_entry {
+std::string entry_render_callback_default(debug_menu_entry* entry);
 
+struct debug_menu_entry {
 	char text[MAX_CHARS];
 	debug_menu_entry_type entry_type;
 	void* data;
 	void* data1;
     uint16_t m_id {0};
-	custom_string_generator_ptr custom_string_generator;
+    std::string (*render_callback)(debug_menu_entry *) = entry_render_callback_default;
     void (*m_game_flags_handler)(debug_menu_entry *) = nullptr;
     void (*frame_advance_callback)(debug_menu_entry *) = entry_frame_advance_callback_default;
     float field_20[4] = {0.f, 1.f, 0.1f, 10.f};
@@ -357,6 +347,11 @@ struct debug_menu_entry {
         this->m_game_flags_handler = a2;
     }
 
+    void set_render_cb(std::string (*a2)(debug_menu_entry *))
+    {
+        this->render_callback = a2;
+    }
+
     debug_menu_entry() = default;
 
     debug_menu_entry(const char *p_text) : entry_type(UNDEFINED), data(nullptr)
@@ -377,6 +372,43 @@ struct debug_menu_entry {
         strncpy(this->text, p_text, MAX_CHARS_SAFE);
     }
 };
+
+std::string entry_render_callback_default(debug_menu_entry* entry) {
+
+    switch(entry->entry_type)
+    {
+    case FLOAT_E:
+    case POINTER_FLOAT:
+    {
+		auto val = entry->get_fval();
+
+        char str[64]{}; 
+		snprintf(str, 64, "%.2f", val);
+		return {str};
+	}
+    case BOOLEAN_E:
+    case POINTER_BOOL:
+    {
+		bool val = entry->get_bval();
+
+		auto *str = (val ? "True" : "False");
+		return {str};
+	}
+    case INTEGER:
+    case POINTER_INT:
+    {
+		auto val = entry->get_ival();
+
+        char str[100]{}; 
+		sprintf(str, "%d", val);
+        return {str};
+    }
+    default:
+        break;
+    }
+
+    return std::string{""};
+}
 
 typedef void (*menu_handler_function)(debug_menu_entry*, custom_key_type key_type);
 

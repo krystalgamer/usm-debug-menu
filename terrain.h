@@ -7,12 +7,33 @@
 #include "region.h"
 #include "string_hash.h"
 
+#include <cassert>
 #include <cstdio>
+
+struct region;
 
 struct terrain
 {
-    char field_0[0x18];
+    region **regions;
+    int field_4;
+    int field_8;
+    int total_regions;
+    int strips;
+    int total_strips;
     float field_18[3];
+
+    region *get_region(int idx)
+    {
+        assert(idx >= 0);
+        assert(idx < total_regions);
+
+        return this->regions[idx];
+    }
+
+    int get_num_regions() const
+    {
+        return this->total_regions;
+    }
 
     void update_region_pack_info()
     {
@@ -43,5 +64,15 @@ struct terrain
         void (__fastcall *func)(void *) = (decltype(func)) 0x00557350;
         func(this);
     }
+
+    void set_district_variant(int a2, int variant, bool a4)
+    {
+        void (__fastcall *func)(void *, void *, int, int, bool) =
+            bit_cast<decltype(func)>( 0x00557480);
+
+        func(this, nullptr, a2, variant, a4);
+    }
+
+
 
 };

@@ -104,7 +104,6 @@ static void *HookVTableFunction(void *pVTable, void *fnHookFunc, int nOffset) {
     return (void *) ptrOriginal;
 }
 
-
 typedef struct _list{
 	struct _list* next;
 	struct _list* prev;
@@ -116,7 +115,6 @@ static constexpr DWORD MAX_ELEMENTS_PAGE = 18;
 debug_menu* warp_menu = nullptr;
 debug_menu* game_menu = nullptr;
 debug_menu* missions_menu = nullptr;
-debug_menu* district_variants_menu = nullptr;
 debug_menu* options_menu = nullptr;
 debug_menu* script_menu = nullptr;
 debug_menu* progression_menu = nullptr;
@@ -127,7 +125,6 @@ debug_menu** all_menus[] = {
 	&warp_menu,
     &game_menu,
 	&missions_menu,
-	&district_variants_menu,
 	&options_menu,
 	&script_menu,
 	&progression_menu,
@@ -202,9 +199,6 @@ region_get_name_ptr region_get_name = (region_get_name_ptr) 0x00519BB0;
 
 typedef int (__fastcall *region_get_district_variant_ptr)(region* );
 region_get_district_variant_ptr region_get_district_variant = (region_get_district_variant_ptr) 0x005503D0;
-
-typedef char(__fastcall* terrain_set_district_variant_ptr)(void* , void* edx, DWORD district_id, int variant, char one);
-terrain_set_district_variant_ptr terrain_set_district_variant = (terrain_set_district_variant_ptr) 0x00557480;
 
 void set_text_writeable() {
 
@@ -353,54 +347,30 @@ int getStringHeight(const char* str) {
 	return height;
 }
 
-std::string getRealText(debug_menu_entry* entry) {
+std::string getRealText(debug_menu_entry *entry) {
+    assert(entry->render_callback != nullptr);
 
-    switch(entry->entry_type)
-    {
-    case FLOAT_E:
-    case POINTER_FLOAT:
-    {
-		auto val = entry->get_fval();
+    auto v1 = entry->render_callback(entry);
 
-        char str[100]; 
-		sprintf(str, "%s: %.2f", entry->text, val);
-		return {str};
-	}
-    case BOOLEAN_E:
-    case POINTER_BOOL:
-    {
-		bool val = entry->get_bval();
-
-        char str[100]; 
-		sprintf(str, "%s: %s", entry->text, val ? "True" : "False");
-		return {str};
-	}
-    case INTEGER:
-    case POINTER_INT:
-    {
-		auto val = entry->get_ival();
-
-        char str[100]; 
-		sprintf(str, "%s: %d", entry->text, val);
-        return {str};
+    char a2a[256]{};
+    if (v1.size() != 0) {
+        auto *v7 = v1.c_str();
+        auto *v4 = entry->text;
+        snprintf(a2a, 255u, "%s: %s", v4, v7);
+    } else {
+        auto *v5 = entry->text;
+        snprintf(a2a, 255u, "%s", v5);
     }
-    case CUSTOM:
-    {
-		return entry->custom_string_generator(entry);
-    }
-    default:
-	    return {entry->text};
-    }
+
+    return {a2a};
 }
 
 void render_current_debug_menu() {
     auto UP_ARROW {" ^ ^ ^ "};
     auto DOWN_ARROW {" v v v "};
 
-
 	int num_elements = std::min((DWORD) MAX_ELEMENTS_PAGE, current_menu->used_slots - current_menu->window_start);
 	int needs_down_arrow = ((current_menu->window_start + MAX_ELEMENTS_PAGE) < current_menu->used_slots) ? 1 : 0;
-
 
 	int cur_width, cur_height;
 	int debug_width = 0;
@@ -420,19 +390,16 @@ void render_current_debug_menu() {
 	int total_elements_page = needs_down_arrow ? MAX_ELEMENTS_PAGE : current_menu->used_slots - current_menu->window_start;
 
 	for (int i = 0; i < total_elements_page; ++i) {
-
 		debug_menu_entry *entry = &current_menu->entries[current_menu->window_start + i];
 		auto cur = getRealText(entry);
 		get_and_update(cur.c_str());
 	}
-
 
 	if (needs_down_arrow) {
 		get_and_update(DOWN_ARROW);
 	}
 
 	nglQuad quad;
-
 
 	int menu_x_start = 20, menu_y_start = 40;
 	int menu_x_pad = 24, menu_y_pad = 18;
@@ -443,12 +410,10 @@ void render_current_debug_menu() {
 	nglSetQuadZ(&quad, 0.5f);
 	nglListAddQuad(&quad);
 
-
 	int white_color = nglColor(255, 255, 255, 255);
 	int yellow_color = nglColor(255, 255, 0, 255);
 	int green_color = nglColor(0, 255, 0, 255);
 	int pink_color = nglColor(255, 0, 255, 255);
-
 
 	int render_height = menu_y_start;
 	render_height += 12;
@@ -456,7 +421,6 @@ void render_current_debug_menu() {
 	render_x += 8;
 	nglListAddString(*nglSysFont, render_x, render_height, 0.2f, green_color, 1.f, 1.f, current_menu->title);
 	render_height += getStringHeight(current_menu->title);
-
 
 	if (current_menu->window_start) {
 		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, pink_color, 1.f, 1.f, UP_ARROW);
@@ -478,16 +442,13 @@ void render_current_debug_menu() {
 		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, pink_color, 1.f, 1.f, DOWN_ARROW);
 		render_height += getStringHeight(DOWN_ARROW);
 	}
-
-
-
-
 }
 
 void myDebugMenu() {
 	if (debug_enabled) {
 		render_current_debug_menu();
 	}
+
 	nglListEndScene();
 }
 
@@ -881,16 +842,9 @@ void setup_warp_menu()
 			warp_entry.data1 = 0;
 			strcpy(warp_entry.text, region_name);
 			add_debug_menu_entry(warp_menu, &warp_entry);
-
-			if (cur_region->variants >= 2) {
-				warp_entry.entry_type = CUSTOM;
-				warp_entry.custom_string_generator = district_variant_string_generator;
-				add_debug_menu_entry(district_variants_menu, &warp_entry);
-			}
 		}
 
 		qsort(warp_menu->entries, *number_of_allocated_regions, sizeof(debug_menu_entry),(int (*)(const void*, const void*)) sort_warp_entries);
-		qsort(district_variants_menu->entries, district_variants_menu->used_slots, sizeof(debug_menu_entry), (int (*)(const void*, const void*)) sort_warp_entries);
 
 	}
 }
@@ -1122,8 +1076,8 @@ void menu_input_handler(int keyboard, int SCROLL_SPEED) {
 		debug_menu_entry* cur = &current_menu->entries[current_menu->window_start + current_menu->cur_index];
 		if (cur->entry_type == POINTER_BOOL ||
                 cur->entry_type == POINTER_INT ||
-                cur->entry_type == INTEGER ||
-                cur->entry_type == CUSTOM) {
+                cur->entry_type == INTEGER
+                ) {
 			//current_menu->handler(cur, (is_menu_key_pressed(MENU_LEFT, keyboard) ? LEFT : RIGHT));
 
             if (is_menu_key_pressed(MENU_LEFT, keyboard)) {
@@ -1570,27 +1524,6 @@ void handle_script_select_entry(debug_menu_entry* entry) {
 	handle_progression_select_entry(entry);
 }
 
-void handle_distriction_variants_select_entry(debug_menu_entry* entry, custom_key_type key_type) {
-
-	region* reg = static_cast<region *>(entry->data);
-	void* terrain_ptr = g_world_ptr()->the_terrain;
-	int variants = reg->variants;
-	int current_variant = region_get_district_variant(reg);
-	DWORD district_id = reg->district_id;
-
-	switch (key_type) {
-
-	case LEFT:
-		terrain_set_district_variant(terrain_ptr, nullptr, district_id, modulo(current_variant-1, variants), 1);
-		break;
-	case RIGHT:
-		terrain_set_district_variant(terrain_ptr, nullptr, district_id, modulo(current_variant+1, variants), 1);
-		break;
-	default:
-		return;
-	}
-}
-
 void create_devopt_menu(debug_menu *parent)
 {
     assert(parent != nullptr);
@@ -1848,7 +1781,7 @@ void game_flags_handler(debug_menu_entry *a1)
     }
     case 17u:
     {
-        auto v12 = a1->get_bval();
+        [[maybe_unused]]auto v12 = a1->get_bval();
 
         //TODO
         //sub_6A88A5(g_game_ptr, v12);
@@ -2027,9 +1960,8 @@ void debug_menu::init() {
 	missions_menu = create_menu("Missions");
 	options_menu = create_menu("Options", handle_options_select_entry, 2);
 	script_menu = create_menu("Script", (menu_handler_function) handle_script_select_entry, 50);
-	progression_menu = create_menu("Progression", (menu_handler_function) handle_progression_select_entry, 10);
-	district_variants_menu = create_menu("District variants", handle_distriction_variants_select_entry, 15);
-    level_select_menu = create_menu("Level Select", (menu_handler_function) handle_level_select_entry, 10);
+	progression_menu = create_menu("Progression");
+    level_select_menu = create_menu("Level Select");
 
 	debug_menu_entry warp_entry { warp_menu };
 	debug_menu_entry game_entry { game_menu };
@@ -2037,13 +1969,14 @@ void debug_menu::init() {
 	debug_menu_entry options_entry { options_menu };
 	debug_menu_entry script_entry { script_menu };
 	debug_menu_entry progression_entry { progression_menu };
-	debug_menu_entry district_entry { district_variants_menu };
 	debug_menu_entry level_select_entry { level_select_menu };
 
 	add_debug_menu_entry(root_menu, &warp_entry);
 	add_debug_menu_entry(root_menu, &game_entry);
 	add_debug_menu_entry(root_menu, &missions_entry);
-	add_debug_menu_entry(root_menu, &district_entry);
+
+    create_debug_district_variants_menu(root_menu);
+
 	add_debug_menu_entry(root_menu, &options_entry);
 	add_debug_menu_entry(root_menu, &script_entry);
 	add_debug_menu_entry(root_menu, &progression_entry);

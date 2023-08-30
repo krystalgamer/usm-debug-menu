@@ -86,12 +86,6 @@ level_descriptor_t *get_level_descriptors(int *arg0)
     return v11;
 }
 
-void handle_level_select_entry(debug_menu_entry *entry)
-{
-    entry->m_game_flags_handler(entry);
-    close_debug();
-}
-
 void level_select_handler(debug_menu_entry *entry)
 {
     auto *v1 = entry->text;
