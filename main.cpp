@@ -931,11 +931,12 @@ void mission_select_handler(debug_menu_entry *entry)
     auto v3 = v7->field_10;
     auto *v2 = mission_manager::s_inst();
     v2->force_mission(v3, v4, v5, v6);
+    close_debug();
 }
 
 void create_game_flags_menu(debug_menu *parent);
 
-void populate_missions_menu()
+void populate_missions_menu(debug_menu *missions_menu)
 {
     if (missions_menu->used_slots == 0)
     {
@@ -1057,7 +1058,7 @@ void menu_setup(int game_state, int keyboard) {
 
 		setup_warp_menu();
 		
-		populate_missions_menu();
+		populate_missions_menu(missions_menu);
 
         create_game_flags_menu(game_menu);
 
@@ -1494,17 +1495,6 @@ void handle_debug_entry(debug_menu_entry* entry, custom_key_type) {
 
 typedef char (__fastcall *entity_tracker_manager_get_the_arrow_target_pos_ptr)(DWORD* , void* edx, float* a2);
 entity_tracker_manager_get_the_arrow_target_pos_ptr entity_tracker_manager_get_the_arrow_target_pos = (entity_tracker_manager_get_the_arrow_target_pos_ptr) 0x0062EE10;
-
-
-void handle_missions_entry(debug_menu_entry* entry)
-{
-    if (entry->m_game_flags_handler != nullptr)
-    {
-        entry->m_game_flags_handler(entry);
-    }
-
-	close_debug();
-}
 
 void handle_warp_entry(debug_menu_entry* entry) {
 	
@@ -2048,7 +2038,7 @@ void debug_menu::init() {
 	root_menu = create_menu("Debug Menu", handle_debug_entry, 10);
 	warp_menu = create_menu("Warp", (menu_handler_function) handle_warp_entry, 300);
 	game_menu = create_menu("Game", handle_game_entry, 300);
-	missions_menu = create_menu("Missions", (menu_handler_function) handle_missions_entry, 300);
+	missions_menu = create_menu("Missions");
 	options_menu = create_menu("Options", handle_options_select_entry, 2);
 	script_menu = create_menu("Script", (menu_handler_function) handle_script_select_entry, 50);
 	progression_menu = create_menu("Progression", (menu_handler_function) handle_progression_select_entry, 10);

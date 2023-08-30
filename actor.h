@@ -91,6 +91,7 @@ void actor::get_animations(actor *a1, std::list<nalAnimClass<nalAnyPose> *> &a2)
 
 animation_controller::anim_ctrl_handle actor::play_anim(const string_hash &a3)
 {
+    printf("actor::play_anim\n");
     if ( this->anim_ctrl == nullptr ) {
         this->allocate_anim_controller(0u, nullptr);
     }

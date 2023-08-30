@@ -26,6 +26,8 @@ animation_controller::anim_ctrl_handle animation_controller::play_base_layer_ani
         uint32_t a5,
         bool a6)
 {
+    printf("animation_controller::play_base_layer_anim\n");
+
     animation_controller::anim_ctrl_handle result;
     void (__fastcall *func)(void *, int, animation_controller::anim_ctrl_handle *, const string_hash *, Float, uint32_t, bool) = bit_cast<decltype(func)>(0x0049B9A0);
     func(this, 0, &result, &a3, a4, a5, a6);
@@ -35,6 +37,8 @@ animation_controller::anim_ctrl_handle animation_controller::play_base_layer_ani
 
 void animation_controller::anim_ctrl_handle::set_anim_speed(Float a2)
 {
+    printf("animation_controller::anim_ctrl_handle::set_anim_speed\n");
+
     struct {
         char field_0[0x58];
         void (__fastcall *field_58)(void *, int, Float);
