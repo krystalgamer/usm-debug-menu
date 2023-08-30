@@ -8,7 +8,7 @@
 #include "resource_pack_slot.h"
 #include "vector3d.h"
 
-#include <list>
+#include <vector>
 
 struct nalAnyPose;
 struct nalBaseSkeleton;
@@ -59,15 +59,17 @@ struct actor
 
     animation_controller::anim_ctrl_handle play_anim(const string_hash &a3);
 
-    static void get_animations(actor *a1, std::list<nalAnimClass<nalAnyPose> *> &a2);
+    static std::vector<nalAnimClass<nalAnyPose> *> get_animations(actor *a1);
 };
 
 VALIDATE_OFFSET(actor, m_player_controller, 0x8C);
 VALIDATE_OFFSET(actor, field_BC, 0xBC);
 
-void actor::get_animations(actor *a1, std::list<nalAnimClass<nalAnyPose> *> &a2)
+std::vector<nalAnimClass<nalAnyPose> *> actor::get_animations(actor *a1)
 {
-    a2.clear();
+    std::vector<nalAnimClass<nalAnyPose> *> a2;
+    a2.reserve(100u);
+
     auto *v11 = a1->field_BC;
     if ( v11 != nullptr )
     {
@@ -87,6 +89,8 @@ void actor::get_animations(actor *a1, std::list<nalAnimClass<nalAnyPose> *> &a2)
             }
         }
     }
+
+    return a2;
 }
 
 animation_controller::anim_ctrl_handle actor::play_anim(const string_hash &a3)
@@ -99,10 +103,8 @@ animation_controller::anim_ctrl_handle actor::play_anim(const string_hash &a3)
     assert(anim_ctrl != nullptr);
     this->anim_ctrl->play_base_layer_anim(a3, 0.0, 32u, true);
 
-    {
-        animation_controller::anim_ctrl_handle result{};
-        result.field_0 = true;
-        result.field_8 = bit_cast<decltype(result.field_8)>(this->anim_ctrl);
-        return result;
-    }
+    animation_controller::anim_ctrl_handle result{};
+    result.field_0 = true;
+    result.field_8 = bit_cast<decltype(result.field_8)>(this->anim_ctrl);
+    return result;
 }

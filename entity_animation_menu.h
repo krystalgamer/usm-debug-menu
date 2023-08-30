@@ -38,8 +38,7 @@ void sub_6918AD(debug_menu_entry *entry)
         entry->set_submenu(a1);
         auto *v18 = (actor *) e;
 
-        std::list<nalAnimClass<nalAnyPose> *> v17;
-        actor::get_animations(v18, v17);
+        auto v17 = actor::get_animations(v18);
         for (auto *v15 : v17)
         {
             auto &v3 = v15->field_8;
@@ -66,8 +65,7 @@ void populate_entity_animation_menu(debug_menu_entry *entry)
         {
             auto *v23 = (actor *) ent;
 
-            std::list<nalAnimClass<nalAnyPose> *> v22;
-            actor::get_animations(v23, v22);
+            auto  v22 = actor::get_animations(v23);
             if ( !v22.empty() )
             {
                 auto &id = bit_cast<entity *>(v23)->get_id();

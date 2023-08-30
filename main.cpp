@@ -532,9 +532,6 @@ world_dynamics_system_remove_player_ptr world_dynamics_system_remove_player = (w
 typedef int (__fastcall* world_dynamics_system_add_player_ptr)(void* , void* edx, mString* str);
 world_dynamics_system_add_player_ptr world_dynamics_system_add_player = (world_dynamics_system_add_player_ptr) 0x0055B400;
 
-DWORD changing_model = 0;
-const char* current_costume = "ultimate_spiderman";
-
 typedef int (*entity_teleport_abs_po_ptr)(DWORD, float*, int one);
 entity_teleport_abs_po_ptr entity_teleport_abs_po = (entity_teleport_abs_po_ptr) 0x004F3890;
 
@@ -630,6 +627,7 @@ uint8_t __stdcall slf__destroy_debug_menu_entry__debug_menu_entry(slf* function,
 	return 1;
 }
 
+void handle_progression_select_entry(debug_menu_entry* entry);
 
 uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
 
@@ -646,13 +644,13 @@ uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
 	script_instance* instance = function->thread->instance;
 	int functionid = script_object_find_func(instance->object, nullptr, (string_hash *) *(DWORD*)&strhash);
 
-	debug_menu_entry entry;
-	memset(&entry, 0, sizeof(entry));
+	debug_menu_entry entry {};
 	entry.entry_type = UNDEFINED;
 	entry.data = instance;
 	entry.data1 = (void *) functionid;
 
 	strcpy(entry.text, strs[0]);
+    entry.set_game_flags_handler(handle_progression_select_entry);
 
 	add_debug_menu_entry(progression_menu, &entry);
 
@@ -673,11 +671,11 @@ uint8_t __stdcall slf__create_debug_menu_entry(slf* function, void* unk) {
 
 	//printf("Entry: %s ", strs[0]);
 
-
-	debug_menu_entry entry;
-	memset(&entry, 0, sizeof(entry));
+	debug_menu_entry entry {};
 	entry.entry_type = UNDEFINED;
 	strcpy(entry.text, strs[0]);
+
+    printf("entry.text = %s\n", entry.text);
 
 	void *res = add_debug_menu_entry(script_menu, &entry);
 
@@ -1332,18 +1330,6 @@ int __fastcall game_handle_game_states(game* self, void* edx, void* a2) {
 
 	if (!g_game_ptr()) {
 		g_game_ptr() = self;
-	}
-
-	if (changing_model) {
-
-
-		changing_model--;
-
-		if (!changing_model) {
-			mString str {current_costume};
-			world_dynamics_system_add_player(g_world_ptr(), nullptr, &str);
-			game_unpause(g_game_ptr());
-		}
 	}
 
 	/*
