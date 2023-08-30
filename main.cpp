@@ -117,7 +117,6 @@ debug_menu* warp_menu = nullptr;
 debug_menu* game_menu = nullptr;
 debug_menu* missions_menu = nullptr;
 debug_menu* district_variants_menu = nullptr;
-debug_menu* char_select_menu = nullptr;
 debug_menu* options_menu = nullptr;
 debug_menu* script_menu = nullptr;
 debug_menu* progression_menu = nullptr;
@@ -129,7 +128,6 @@ debug_menu** all_menus[] = {
     &game_menu,
 	&missions_menu,
 	&district_variants_menu,
-	&char_select_menu,
 	&options_menu,
 	&script_menu,
 	&progression_menu,
@@ -1066,7 +1064,7 @@ void menu_setup(int game_state, int keyboard) {
 
         if (level_select_menu->used_slots == 0)
         {
-            create_level_select_menu();
+            create_level_select_menu(level_select_menu);
         }
 
 		if (options_menu->used_slots == 2) {
@@ -1090,7 +1088,6 @@ void menu_setup(int game_state, int keyboard) {
 
 void menu_input_handler(int keyboard, int SCROLL_SPEED) {
 	if (is_menu_key_clicked(MENU_DOWN, keyboard)) {
-
 
 		int key_val = get_menu_key_value(MENU_DOWN, keyboard);
 		if (key_val == 1) {
@@ -1127,7 +1124,7 @@ void menu_input_handler(int keyboard, int SCROLL_SPEED) {
 		if (cur->entry_type == POINTER_BOOL ||
                 cur->entry_type == POINTER_INT ||
                 cur->entry_type == INTEGER ||
-                cur->entry_type == CUSTOM)
+                cur->entry_type == CUSTOM) {
 			//current_menu->handler(cur, (is_menu_key_pressed(MENU_LEFT, keyboard) ? LEFT : RIGHT));
 
             if (is_menu_key_pressed(MENU_LEFT, keyboard)) {
@@ -1135,8 +1132,14 @@ void menu_input_handler(int keyboard, int SCROLL_SPEED) {
             } else {
                 cur->on_change(1.0, true);
             }
+        }
 	}
+
+	debug_menu_entry *highlighted = &current_menu->entries[current_menu->window_start + current_menu->cur_index];
+    assert(highlighted->frame_advance_callback != nullptr);
+    highlighted->frame_advance_callback(highlighted);
 }
+
 
 HRESULT __stdcall GetDeviceStateHook(IDirectInputDevice8* self, DWORD cbData, LPVOID lpvData) {
 
@@ -1538,21 +1541,6 @@ void handle_warp_entry(debug_menu_entry* entry) {
 
 	close_debug();
 	entity_teleport_abs_po(fancy_player_ptr[3], position, 1);
-}
-
-void handle_char_select_entry(debug_menu_entry* entry) {
-
-    for (auto num_players = g_world_ptr()->num_players;
-            num_players != 0;
-            num_players = g_world_ptr()->num_players)
-    {
-		//printf("some_number %d %d\n", *some_number, num_players);
-		world_dynamics_system_remove_player(g_world_ptr(), nullptr, num_players - 1);
-	}
-
-	debug_enabled = 0;
-	changing_model = 2;
-	current_costume = entry->text;
 }
 
 void set_god_mode(int a1)
@@ -2061,7 +2049,6 @@ void debug_menu::init() {
 	warp_menu = create_menu("Warp", (menu_handler_function) handle_warp_entry, 300);
 	game_menu = create_menu("Game", handle_game_entry, 300);
 	missions_menu = create_menu("Missions", (menu_handler_function) handle_missions_entry, 300);
-	char_select_menu = create_menu("Char Select", (menu_handler_function) handle_char_select_entry, 5);
 	options_menu = create_menu("Options", handle_options_select_entry, 2);
 	script_menu = create_menu("Script", (menu_handler_function) handle_script_select_entry, 50);
 	progression_menu = create_menu("Progression", (menu_handler_function) handle_progression_select_entry, 10);
@@ -2071,7 +2058,6 @@ void debug_menu::init() {
 	debug_menu_entry warp_entry { warp_menu };
 	debug_menu_entry game_entry { game_menu };
 	debug_menu_entry missions_entry { missions_menu };
-	debug_menu_entry char_select { char_select_menu };
 	debug_menu_entry options_entry { options_menu };
 	debug_menu_entry script_entry { script_menu };
 	debug_menu_entry progression_entry { progression_menu };
@@ -2082,35 +2068,12 @@ void debug_menu::init() {
 	add_debug_menu_entry(root_menu, &game_entry);
 	add_debug_menu_entry(root_menu, &missions_entry);
 	add_debug_menu_entry(root_menu, &district_entry);
-	add_debug_menu_entry(root_menu, &char_select);
 	add_debug_menu_entry(root_menu, &options_entry);
 	add_debug_menu_entry(root_menu, &script_entry);
 	add_debug_menu_entry(root_menu, &progression_entry);
 	add_debug_menu_entry(root_menu, &level_select_entry);
 
     create_entity_animation_menu(root_menu);
-
-	const char* costumes[] = {
-		"ultimate_spiderman",
-		"arachno_man_costume",
-		"usm_wrestling_costume",
-		"usm_blacksuit_costume",
-		"peter_parker",
-		"peter_parker_costume",
-		"peter_hooded",
-		"peter_hooded_costume",
-		"venom",
-		"venom_spider"
-	};
-
-
-	for (auto i = 0u; i < sizeof(costumes) / sizeof(char*); ++i) {
-		debug_menu_entry char_entry;
-		char_entry.entry_type = UNDEFINED;
-		strcpy(char_entry.text, costumes[i]);
-
-		add_debug_menu_entry(char_select_menu, &char_entry);
-	}
 
 	debug_menu_entry show_fps = { "Show FPS", POINTER_BOOL, (void *) 0x975848 };
 	debug_menu_entry memory_info = { "Memory Info", POINTER_BOOL, (void *) 0x975849 };

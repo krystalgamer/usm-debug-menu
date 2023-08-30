@@ -34,7 +34,13 @@ const char *hero_list[NUM_HEROES] = {
 		"venom_spider"
 	};
 
-int hero_status;
+enum class hero_status_e {
+    UNDEFINED = 0,
+    REMOVE_PLAYER = 1,
+    ADD_PLAYER = 2,
+    CHANGE_HEALTH_TYPE = 3,
+} hero_status;
+
 int hero_selected;
 int frames_to_skip = 2;
 
@@ -122,9 +128,7 @@ void hero_entry_callback(debug_menu_entry *);
 
 void hero_toggle_handler(debug_menu_entry *entry);
 
-extern debug_menu *level_select_menu;
-
-void create_level_select_menu()
+void create_level_select_menu(debug_menu *level_select_menu)
 {
     //assert(debug_menu::root_menu != nullptr);
 
@@ -156,12 +160,12 @@ void create_level_select_menu()
     
     level_select_menu->add_entry(&v38);
 
-    static debug_menu *hero_select_menu = create_menu("Hero Select", (menu_handler_function) handle_hero_select_menu, 10);
+    static debug_menu *hero_select_menu = create_menu("Hero Select");
 
     debug_menu_entry v28 {hero_select_menu};
 
     level_select_menu->add_entry(&v28);
-    for ( auto i = 0u; i < 10u; ++i )
+    for ( auto i = 0u; i < NUM_HEROES; ++i )
     {
         auto v6 = 25;
         string_hash v5{hero_list[i]};
@@ -183,47 +187,51 @@ void create_level_select_menu()
 
 struct debug_menu_entry;
 
-
 void hero_toggle_handler(debug_menu_entry *entry)
 {
-    constexpr auto NUM_HEROES = 10;
+    printf("hero_toggle_handler\n");
     assert(entry->get_id() < NUM_HEROES);
     hero_selected = entry->get_id();
-    hero_status = 1;
+    hero_status = hero_status_e::REMOVE_PLAYER;
 }
 
 void hero_entry_callback(debug_menu_entry *)
 {
+    printf("hero_entry_callback: hero_status = %d\n", hero_status);
+
     auto v18 = g_world_ptr()->num_players;
     switch ( hero_status )
     {
-    case 1:
+    case hero_status_e::REMOVE_PLAYER:
     {
         g_world_ptr()->remove_player(v18 - 1);
-        hero_status = 2;
+        hero_status = hero_status_e::ADD_PLAYER;
         frames_to_skip = 2;
         g_game_ptr()->enable_marky_cam(true, true, -1000.0, 0.0);
         break;
     }
-    case 2:
+    case hero_status_e::ADD_PLAYER:
     {
         auto v1 = frames_to_skip--;
         if ( v1 <= 0 )
         {
             assert(hero_selected > -1 && hero_selected < NUM_HEROES);
 
-            auto v2 = g_world_ptr()->add_player(mString {hero_list[hero_selected]});
+            [[maybe_unused]] auto v2 = g_world_ptr()->add_player(mString {hero_list[hero_selected]});
+
+            /*
             auto v10 = v2 <= v18;
 
             assert(v10 && "Cannot add another_player");
+            */
                
             g_game_ptr()->enable_marky_cam(false, true, -1000.0, 0.0);
             frames_to_skip = 2;
-            hero_status = 3;
+            hero_status = hero_status_e::CHANGE_HEALTH_TYPE;
         }
         break;
     }
-    case 3:
+    case hero_status_e::CHANGE_HEALTH_TYPE: {
         auto v3 = frames_to_skip--;
         if ( v3 <= 0 )
         {
@@ -249,8 +257,11 @@ void hero_entry_callback(debug_menu_entry *)
             g_femanager().IGO->hero_health->SetType(v17, v8.field_0);
             g_femanager().IGO->hero_health->SetShown(true);
             close_debug();
-            hero_status = 0;
+            hero_status = hero_status_e::UNDEFINED;
         }
+        break;
+    }
+    default:
         break;
     }
 }

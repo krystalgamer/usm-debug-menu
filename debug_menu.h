@@ -53,6 +53,11 @@ enum custom_key_type {
 struct debug_menu_entry;
 typedef char* (*custom_string_generator_ptr)(debug_menu_entry* entry);
 
+void entry_frame_advance_callback_default(debug_menu_entry *a1)
+{
+  ;
+}
+
 struct debug_menu;
 
 struct debug_menu_entry {
@@ -64,7 +69,7 @@ struct debug_menu_entry {
     uint16_t m_id {0};
 	custom_string_generator_ptr custom_string_generator;
     void (*m_game_flags_handler)(debug_menu_entry *) = nullptr;
-    void (*frame_advance_callback)(debug_menu_entry *) = nullptr;
+    void (*frame_advance_callback)(debug_menu_entry *) = entry_frame_advance_callback_default;
     float field_20[4] = {0.f, 1.f, 0.1f, 10.f};
     bool m_value_initialized{false};
 
