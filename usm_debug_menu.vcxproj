@@ -58,6 +58,9 @@
     <ClInclude Include="entity_animation_menu.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="entity_tracker_manager.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="fe_health_widget.h" />
   </ItemGroup>
   <ItemGroup>

@@ -14,12 +14,11 @@ struct region {
     int field_44;
     int field_48;
     int field_4C;
-	uint8_t status;
-	uint8_t unk1[0x53];
-	float x;
-	float y;
-	float z;
-	uint8_t unk2[0x10];
+	int flags;
+	uint8_t unk1[0x50];
+    vector3d field_A4;
+    float field_B0[3];
+    float field_BC;
 	DWORD district_id;
 	uint8_t unk3[0x4];
 	uint8_t variants;
@@ -27,6 +26,11 @@ struct region {
 
     fixedstring32 &get_name() {
         return this->mash_info->field_0;
+    }
+
+    bool is_locked() const
+    {
+        return this->flags & 1;
     }
 
     int get_district_variant_count() const
@@ -49,4 +53,6 @@ struct region {
 };
 
 VALIDATE_OFFSET(region, mash_info, 0x2C);
+VALIDATE_OFFSET(region, flags, 0x50);
 VALIDATE_OFFSET(region, district_id, 0xC0);
+VALIDATE_SIZE(region, 0x134);

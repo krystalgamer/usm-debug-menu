@@ -68,11 +68,16 @@ struct terrain
     void set_district_variant(int a2, int variant, bool a4)
     {
         void (__fastcall *func)(void *, void *, int, int, bool) =
-            bit_cast<decltype(func)>( 0x00557480);
+            bit_cast<decltype(func)>(0x00557480);
 
         func(this, nullptr, a2, variant, a4);
     }
 
+    void unlock_district(int a2) {
+        void (__fastcall *func)(void *, void *, int) =
+            bit_cast<decltype(func)>(0x005148A0);
 
+        func(this, nullptr, a2);
+    }
 
 };

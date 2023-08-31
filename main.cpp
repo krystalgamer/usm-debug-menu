@@ -112,7 +112,6 @@ typedef struct _list{
 
 static constexpr DWORD MAX_ELEMENTS_PAGE = 18;
 
-debug_menu* warp_menu = nullptr;
 debug_menu* game_menu = nullptr;
 debug_menu* missions_menu = nullptr;
 debug_menu* options_menu = nullptr;
@@ -122,7 +121,6 @@ debug_menu* level_select_menu = nullptr;
 
 debug_menu** all_menus[] = {
 	&debug_menu::root_menu,
-	&warp_menu,
     &game_menu,
 	&missions_menu,
 	&options_menu,
@@ -132,7 +130,7 @@ debug_menu** all_menus[] = {
 };
 
 void unlock_region(region* cur_region) {
-	cur_region->status &= 0xFE;
+	cur_region->flags &= 0xFE;
 }
 
 void remove_debug_menu_entry(debug_menu_entry* entry) {
@@ -705,17 +703,6 @@ void menu_go_up() {
 
 }
 
-int sort_warp_entries(debug_menu_entry* entry1, debug_menu_entry* entry2) {
-	return strcmp(entry1->text, entry2->text);
-}
-
-char* district_variant_string_generator(debug_menu_entry* entry) {
-
-	char buffer[128];
-	sprintf(buffer, "%s: %d", entry->text, region_get_district_variant((region *) entry->data));
-	return buffer;
-}
-
 typedef enum {
 	MENU_TOGGLE,
 	MENU_ACCEPT,
@@ -824,29 +811,6 @@ void GetDeviceStateHandleControllerInput(LPVOID lpvData) {
 	read_and_update_controller_key_dpad(joy, 9000, MENU_RIGHT);
 	read_and_update_controller_key_dpad(joy, 18000, MENU_DOWN);
 	read_and_update_controller_key_dpad(joy, 27000, MENU_LEFT);
-}
-
-void setup_warp_menu()
-{
-    if (warp_menu->used_slots == 0) {
-
-		debug_menu_entry poi = { "--- WARP TO POI ---" };
-		poi.data1 = (void *) 1;
-		add_debug_menu_entry(warp_menu, &poi);
-
-		for (auto i = 0u; i < *number_of_allocated_regions; ++i) {
-			region* cur_region = &(*all_regions)[i];
-			auto *region_name = region_get_name(cur_region);
-
-			debug_menu_entry warp_entry = { "", UNDEFINED, cur_region };
-			warp_entry.data1 = 0;
-			strcpy(warp_entry.text, region_name);
-			add_debug_menu_entry(warp_menu, &warp_entry);
-		}
-
-		qsort(warp_menu->entries, *number_of_allocated_regions, sizeof(debug_menu_entry),(int (*)(const void*, const void*)) sort_warp_entries);
-
-	}
 }
 
 typedef int (*resource_manager_can_reload_amalgapak_ptr)(void);
@@ -1008,12 +972,9 @@ void menu_setup(int game_state, int keyboard) {
 			current_menu = debug_menu::root_menu;
 		}
 
-		setup_warp_menu();
-		
 		populate_missions_menu(missions_menu);
 
         create_game_flags_menu(game_menu);
-
 
         if (level_select_menu->used_slots == 0)
         {
@@ -1433,45 +1394,8 @@ void handle_debug_entry(debug_menu_entry* entry, custom_key_type) {
 	current_menu = static_cast<decltype(current_menu)>(entry->data);
 }
 
-typedef char (__fastcall *entity_tracker_manager_get_the_arrow_target_pos_ptr)(DWORD* , void* edx, float* a2);
+typedef bool (__fastcall *entity_tracker_manager_get_the_arrow_target_pos_ptr)(void *, void *, vector3d *);
 entity_tracker_manager_get_the_arrow_target_pos_ptr entity_tracker_manager_get_the_arrow_target_pos = (entity_tracker_manager_get_the_arrow_target_pos_ptr) 0x0062EE10;
-
-void handle_warp_entry(debug_menu_entry* entry) {
-	
-	float position[] = {
-		0, -0, 1, 0,
-		1, -0, -0, 0,
-		0, 1, 0, 0,
-		-203, 20, 430, 1
-	};
-
-	/*
-	DWORD arg1 = *(DWORD*)0x96C158;
-	DWORD* some_ptr = ai_ai_core_get_info_node(ai_current_player[5], NULL, arg1, 1);
-	printf("WHYYYY %08X %08X\n", fancy_player_ptr, some_ptr);
-	*/
-
-	float final_pos[3] = { -203, 20, 430 };
-	if (entry->data1 == 0) {
-		region* cur_region = static_cast<region*>(entry->data);
-		final_pos[0] = cur_region->x;
-		final_pos[1] = cur_region->y;
-		final_pos[2] = cur_region->z;
-		unlock_region(cur_region);
-	}
-	else {
-		int res = entity_tracker_manager_get_the_arrow_target_pos( *(*(DWORD***)0x937B18 + 21), nullptr, final_pos);
-		if (!res)
-			return;
-	}
-
-	position[12] = final_pos[0];
-	position[13] = final_pos[1];
-	position[14] = final_pos[2];
-
-	close_debug();
-	entity_teleport_abs_po(fancy_player_ptr[3], position, 1);
-}
 
 void set_god_mode(int a1)
 {
@@ -1955,7 +1879,6 @@ void create_game_flags_menu(debug_menu *parent)
 void debug_menu::init() {
 
 	root_menu = create_menu("Debug Menu", handle_debug_entry, 10);
-	warp_menu = create_menu("Warp", (menu_handler_function) handle_warp_entry, 300);
 	game_menu = create_menu("Game", handle_game_entry, 300);
 	missions_menu = create_menu("Missions");
 	options_menu = create_menu("Options", handle_options_select_entry, 2);
@@ -1963,7 +1886,6 @@ void debug_menu::init() {
 	progression_menu = create_menu("Progression");
     level_select_menu = create_menu("Level Select");
 
-	debug_menu_entry warp_entry { warp_menu };
 	debug_menu_entry game_entry { game_menu };
 	debug_menu_entry missions_entry { missions_menu };
 	debug_menu_entry options_entry { options_menu };
@@ -1971,7 +1893,7 @@ void debug_menu::init() {
 	debug_menu_entry progression_entry { progression_menu };
 	debug_menu_entry level_select_entry { level_select_menu };
 
-	add_debug_menu_entry(root_menu, &warp_entry);
+    create_warp_menu(root_menu);
 	add_debug_menu_entry(root_menu, &game_entry);
 	add_debug_menu_entry(root_menu, &missions_entry);
 

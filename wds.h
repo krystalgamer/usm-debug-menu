@@ -14,6 +14,10 @@ struct world_dynamics_system
     int field_234;
     int num_players;
 
+    auto *get_the_terrain() {
+        return the_terrain;
+    }
+
     entity *get_hero_ptr(int index) {
         constexpr auto MAX_GAME_PLAYERS = 1;
 
@@ -28,6 +32,12 @@ struct world_dynamics_system
         void (__fastcall *func)(void *, void *, int) = bit_cast<decltype(func)>(0x00558550);
 
         func(this, nullptr, player_num);
+    }
+
+    void malor_point(const vector3d *a2, int a3, bool a4)
+    {
+        void (__fastcall *func)(void *, void *, const vector3d *, int, bool) = bit_cast<decltype(func)>(0x00530460);
+        func(this, nullptr, a2, a3, a4);
     }
 
     int add_player(const mString &a2)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "debug_menu.h"
+#include "entity_tracker_manager.h"
 #include "game_settings.h"
 
 void district_variants_handler(debug_menu_entry *entry)
@@ -590,4 +591,79 @@ void create_gamefile_menu(debug_menu *parent)
 
     debug_menu_entry *entry = &parent->entries[parent->used_slots - 1];
     populate_gamefile_menu(entry);
+}
+
+void warp_handler(debug_menu_entry *entry)
+{
+    auto idx = entry->get_id();
+    auto *the_terrain = g_world_ptr()->the_terrain;
+    if ( the_terrain != nullptr )
+    {
+        auto *reg = the_terrain->get_region(idx);
+        if ( reg->is_locked() )
+        {
+            auto district_id = reg->get_district_id();
+            auto *v1 = g_world_ptr()->get_the_terrain();
+            v1->unlock_district(district_id);
+        }
+
+        auto *v2 = &reg->field_A4;
+        g_world_ptr()->malor_point(v2, 0, false);
+    }
+
+    debug_menu::hide();
+}
+
+void warp_poi_handler(debug_menu_entry *menu_entry)
+{
+    auto *v2 = g_femanager().IGO->field_54;
+    if ( v2 != nullptr )
+    {
+        vector3d a1{};
+        if ( v2->get_the_arrow_target_pos(&a1) )
+        {
+            g_world_ptr()->malor_point(&a1, 0, false);
+            debug_menu::hide();
+        }
+    }
+}
+
+void populate_warp_menu(debug_menu_entry *entry)
+{
+    printf("populate_warp_menu");
+
+    auto *v20 = create_menu(entry->text);
+    entry->set_submenu(v20);
+
+    debug_menu_entry v19 {mString {"--WARP TO POI--"}};
+    v19.set_game_flags_handler(warp_poi_handler);
+    v20->add_entry(&v19);
+    auto *the_terrain = g_world_ptr()->the_terrain;
+    if ( the_terrain != nullptr )
+    {
+        auto num_regions = the_terrain->get_num_regions();
+        for ( auto idx = 0; idx < num_regions; ++idx )
+        {
+            auto *reg = the_terrain->get_region(idx);
+            if ( (reg->flags & 0x4000) != 0 )
+            {
+                auto &name = reg->get_name();
+                auto *v4 = name.to_string();
+
+                debug_menu_entry v15 {mString {v4}};
+                v15.set_id(idx);
+                v15.set_game_flags_handler(warp_handler);
+                v20->add_entry(&v15);
+            }
+        }
+    }
+}
+
+void create_warp_menu(debug_menu *parent)
+{
+    debug_menu_entry v5 {mString {"Warp"}};
+
+    v5.set_submenu(nullptr);
+    v5.set_game_flags_handler(populate_warp_menu);
+    parent->add_entry(&v5);
 }
