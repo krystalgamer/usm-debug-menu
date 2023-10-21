@@ -233,6 +233,11 @@ struct debug_menu_entry {
         return this->m_value_initialized;
     }
 
+    void set_value_initialized(bool a2)
+    {
+        m_value_initialized = a2;
+    }
+
     int set_ival(int a2, bool a3)
     {
         if ( !this->is_value_initialized() )
@@ -373,6 +378,10 @@ struct debug_menu_entry {
     }
 };
 
+debug_menu_entry *create_menu_entry(const mString &str);
+
+debug_menu_entry *create_menu_entry(debug_menu *);
+
 std::string entry_render_callback_default(debug_menu_entry* entry) {
 
     switch(entry->entry_type)
@@ -417,6 +426,12 @@ void close_debug();
 debug_menu* current_menu = nullptr;
 
 struct debug_menu {
+    enum class sort_mode_t {
+        undefined = 0,
+        ascending = 1,
+        descending = 2,
+    };
+
 	char title[MAX_CHARS];
 	DWORD capacity;
 	DWORD used_slots;
@@ -427,6 +442,12 @@ struct debug_menu {
     debug_menu *m_parent {nullptr};
 
     void add_entry(debug_menu_entry *entry);
+
+    void add_entry(debug_menu *a1)
+    {
+        debug_menu_entry entry {a1};
+        this->add_entry(&entry);
+    }
 
     static void hide()
     {
@@ -573,7 +594,7 @@ debug_menu* create_menu(const char* title, menu_handler_function function, DWORD
 	return menu;
 }
 
-debug_menu* create_menu(const char* title)
+debug_menu* create_menu(const char* title, debug_menu::sort_mode_t mode = debug_menu::sort_mode_t::undefined)
 {
     const auto capacity = 100u;
 	auto *mem = malloc(sizeof(debug_menu));
@@ -588,6 +609,18 @@ debug_menu* create_menu(const char* title)
 	memset(menu->entries, 0, total_entries_size);
 
 	return menu;
+}
+
+debug_menu_entry *create_menu_entry(const mString &str)
+{
+    auto *entry = new debug_menu_entry {str};
+    return entry;
+}
+
+debug_menu_entry *create_menu_entry(debug_menu *menu)
+{
+    auto *entry = new debug_menu_entry{menu};
+    return entry;
 }
 
 const char *to_string(custom_key_type key_type)

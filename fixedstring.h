@@ -31,7 +31,7 @@ struct fixedstring
         return field_0;
     }
 
-    bool operator==(const fixedstring<Num> &a2)
+    bool operator==(const fixedstring<Num> &a2) const
     {
         for ( auto i = 0; i < 2; ++i )
         {

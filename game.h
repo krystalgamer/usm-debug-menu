@@ -6,12 +6,14 @@
 #include "os_developer_options.h"
 #include "entity_handle_manager.h"
 #include "vector2di.h"
+#include "memory.h"
 #include "ngl.h"
 #include "entity.h"
 #include "physical_interface.h"
 #include "po.h"
 #include "region.h"
 #include "terrain.h"
+#include "utility.h"
 #include "wds.h"
 
 struct game_process
@@ -128,6 +130,8 @@ struct game
     mString get_analyzer_info();
 
     void show_debug_info();
+
+    void frame_advance_level(Float time_inc);
 };
 
 VALIDATE_OFFSET(game, gamefile, 0xC0);
@@ -303,6 +307,21 @@ void game::show_debug_info()
     nglListAddString(nglSysFont(), (float)v13.x, (float)v13.y, 1.0, v15, v15, v6);
 }
 
+void game::frame_advance_level(Float time_inc)
+{
+    printf("game::frame_advance_level\n");
+
+    {
+        static int dword_14EEAC4 {-1};
+        mem_check_leaks_since_checkpoint(dword_14EEAC4, 1);
+        dword_14EEAC4 = mem_set_checkpoint();
+        mem_print_stats("\nMemory log\n");
+    }
+
+    void (__fastcall *func)(void *, void *edx, Float) = (decltype(func)) 0x0055D650;
+    func(this, nullptr, time_inc);
+}
+
 void render_text(const mString &a1, const vector2di &a2, color32 a3, float a4, float a5)
 {
     if ( os_developer_options::instance()->get_flag(mString{"SHOW_DEBUG_TEXT"}) )
@@ -322,4 +341,9 @@ void render_text(const mString &a1, const vector2di &a2, color32 a3, float a4, f
 
         fe_text.Draw();
     }
+}
+
+void game_patch() {
+    auto address = func_address(&game::frame_advance_level);
+    REDIRECT(0x0055D8C2, address);
 }

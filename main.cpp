@@ -27,12 +27,16 @@
 #include "func_wrapper.h"
 #include "fixedstring32.h"
 #include "levelmenu.h"
+#include "memory_menu.h"
 #include "mission_manager.h"
 #include "mission_table_container.h"
 #include "mstring.h"
 #include "region.h"
 #include "debug_menu.h"
 #include "os_developer_options.h"
+#include "script_executable.h"
+#include "script_library_class.h"
+#include "script_object.h"
 #include "spider_monkey.h"
 #include "geometry_manager.h"
 #include "entity.h"
@@ -501,30 +505,20 @@ ai_ai_core_get_info_node_ptr ai_ai_core_get_info_node = (ai_ai_core_get_info_nod
 struct vm_executable;
 
 typedef struct {
-	uint8_t unk[0x20];
-	struct vm_executable** vmexecutable;
-} script_object;
-
-typedef struct {
 	uint8_t unk[0x2C];
 	script_object* object;
 } script_instance;
 
 
-typedef struct {
-	DWORD unk;
-} script_executable;
-
-typedef struct unknown_struct {
-	DWORD unk;
-	script_executable* scriptexecutable;
-} unknown_struct;
-
-typedef struct vm_executable{
-	unknown_struct* unk_struct;
-	DWORD unk[2];
+struct vm_executable {
+	struct {
+        DWORD unk;
+        script_executable *scriptexecutable;
+    } *unk_struct;
+	DWORD field_4;
+	string_hash field_8;
 	DWORD params;
-} vm_executable;
+};
 
 typedef struct {
 	uint8_t unk[0xC];
@@ -532,52 +526,45 @@ typedef struct {
 	vm_executable* vmexecutable;
 } vm_thread;
 
-typedef struct {
+struct vm_stack {
 	uint8_t unk[0x184];
 	DWORD stack_ptr;
 	vm_thread* thread;
-} slf;
+
+    void push(void* data, DWORD size) {
+        memcpy((void *)this->stack_ptr, data, size);
+        this->stack_ptr += size;
+    }
+
+    void pop(DWORD size) {
+        this->stack_ptr -= size;
+    }
+
+};
 
 
-typedef int(__fastcall* script_object_find_func_ptr)(script_object* , void* edx, string_hash* a2);
-script_object_find_func_ptr script_object_find_func = (script_object_find_func_ptr) 0x0058EF80;
+uint8_t __stdcall slf__debug_menu_entry__set_handler__str(vm_stack *stack, void* unk) {
 
+	stack->pop(8);
 
-typedef DWORD  (__fastcall *script_executable_add_allocated_stuff_ptr)(script_executable* , void *edx, int a2, int a3, int a4);
-script_executable_add_allocated_stuff_ptr script_executable_add_allocated_stuff = (script_executable_add_allocated_stuff_ptr) 0x005A34B0;
-
-void vm_stack_push(slf* function, void* data, DWORD size) {
-	memcpy((void *)function->stack_ptr, data, size);
-	function->stack_ptr += size;
-}
-
-void vm_stack_pop(slf* function, DWORD size) {
-	function->stack_ptr -= size;
-}
-
-uint8_t __stdcall slf__debug_menu_entry__set_handler__str(slf* function, void* unk) {
-
-	vm_stack_pop(function, 8);
-
-	void** params = (void**)function->stack_ptr;
+	void** params = (void**)stack->stack_ptr;
 
 	debug_menu_entry* entry = static_cast<decltype(entry)>(params[0]);
 	char* scrpttext = static_cast<char *>(params[1]);
 
-	string_hash strhash;
-    strhash.initialize(0, scrpttext, 0);
+	string_hash strhash {scrpttext};
 
-	script_instance* instance = function->thread->instance;
-	int functionid = script_object_find_func(instance->object, nullptr, (string_hash *) *(DWORD*)&strhash);
+	script_instance* instance = stack->thread->instance;
+	int functionid = instance->object->find_func(strhash);
 	entry->data = instance;
 	entry->data1 = (void *) functionid;
 	
 	return 1;
 }
 
-uint8_t __stdcall slf__destroy_debug_menu_entry__debug_menu_entry(slf* function, void* unk) {
+uint8_t __stdcall slf__destroy_debug_menu_entry__debug_menu_entry(vm_stack* function, void* unk) {
 
-	vm_stack_pop(function, 4);
+	function->pop(4);
 
 	debug_menu_entry** entry = (decltype(entry)) function->stack_ptr;
 
@@ -588,20 +575,38 @@ uint8_t __stdcall slf__destroy_debug_menu_entry__debug_menu_entry(slf* function,
 
 void handle_progression_select_entry(debug_menu_entry* entry);
 
-uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
+void sub_65BB36(script_library_class::function *func, vm_stack *stack, char *a3, int a4)
+{
+    for ( auto i = 0; i < a4; ++i )
+    {
+        if ( *bit_cast<DWORD *>(&a3[4 * i]) == 0x7BAD05CF )
+        {
+            printf("uninitialized parameters in call to 0x%08X", func->m_vtbl);
 
-	vm_stack_pop(function, 8);
+            //v5 = j_vm_stack::get_thread(stack);
+            //vm_thread::slf_error(v5, v6);
 
-	char** strs = (char **)function->stack_ptr;
+            assert(0 && "uninitialized parameters in call to script library function");
+        }
+    }
+}
 
-	//printf("Entry: %s -> %s\n", strs[0], strs[1]);
+uint8_t __fastcall slf__create_progression_menu_entry(script_library_class::function *func, void *, vm_stack *stack, void *unk) {
+
+	stack->pop(8);
+
+    auto *stack_ptr = bit_cast<char *>(stack->stack_ptr);
+    sub_65BB36(func, stack, stack_ptr, 2);
+
+	char** strs = (char **)stack->stack_ptr;
+
+	printf("Entry: %s -> %s\n", strs[0], strs[1]);
 
 
-	string_hash strhash;
-	strhash.initialize(0, strs[1], 0);
+	string_hash strhash {strs[1]};
 
-	script_instance* instance = function->thread->instance;
-	int functionid = script_object_find_func(instance->object, nullptr, (string_hash *) *(DWORD*)&strhash);
+	script_instance* instance = stack->thread->instance;
+	int functionid = instance->object->find_func(strhash);
 
 	debug_menu_entry entry {};
 	entry.entry_type = UNDEFINED;
@@ -618,15 +623,16 @@ uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
 	*/
 	
 	int push = 0;
-	vm_stack_push(function, &push, sizeof(push));
-	return 1;
+	stack->push(&push, sizeof(push));
+	return true;
 }
 
-uint8_t __stdcall slf__create_debug_menu_entry(slf* function, void* unk) {
+bool __fastcall slf__create_debug_menu_entry(script_library_class::function *func, void *, vm_stack* stack, void* unk) {
+	stack->pop(4);
 
-	vm_stack_pop(function, 4);
-
-	char** strs = (char **) function->stack_ptr;
+    auto *stack_ptr = bit_cast<char *>(stack->stack_ptr);
+    sub_65BB36(func, stack, stack_ptr, 1);
+	char** strs = bit_cast<char **>(stack->stack_ptr);
 
 	//printf("Entry: %s ", strs[0]);
 
@@ -636,15 +642,30 @@ uint8_t __stdcall slf__create_debug_menu_entry(slf* function, void* unk) {
 
     printf("entry.text = %s\n", entry.text);
 
+	script_instance* instance = stack->thread->instance;
+    printf("Total funcs: %d\n", instance->object->total_funcs);
+
 	void *res = add_debug_menu_entry(script_menu, &entry);
 
-	script_executable* se = function->thread->vmexecutable->unk_struct->scriptexecutable;
-	script_executable_add_allocated_stuff(se, nullptr, vm_debug_menu_entry_garbage_collection_id, (int) res, 0);
+	script_executable* se = stack->thread->vmexecutable->unk_struct->scriptexecutable;
+    printf("total_script_objects = %d\n", se->total_script_objects);
+    for (auto i = 0; i < se->total_script_objects; ++i) {
+        auto *so = se->field_28[i];
+        printf("Name of script_object = %s\n", so->field_0.to_string());
+
+        for (auto i = 0; i < so->total_funcs; ++i) {
+            printf("Func name: %s\n", so->funcs[i]->field_8.to_string());
+        }
+
+        printf("\n");
+    }
+
+	se->add_allocated_stuff(vm_debug_menu_entry_garbage_collection_id, (int) res, 0);
 
 	//printf("%08X\n", res);
 
 	int push = (int) res;
-	vm_stack_push(function, &push, sizeof(push));
+	stack->push(&push, sizeof(push));
 	return 1;
 }
 
@@ -1327,6 +1348,10 @@ void install_patches() {
         HookFunc(0x005AC347, (DWORD) hook_controlfp, 0, "Patching call to controlfp");
     }
 
+    game_patch();
+
+    slab_allocator_patch();
+
     HookFunc(0x0052B4BF, (DWORD) spider_monkey::render, 0, "Patching call to spider_monkey::render");
 
 	HookFunc(0x004EACF0, (DWORD)aeps_RenderAll, 0, "Patching call to aeps::RenderAll");
@@ -1439,7 +1464,7 @@ void handle_progression_select_entry(debug_menu_entry* entry) {
 
 	DWORD addr = (DWORD) entry;
 
-	script_instance_add_thread(instance, nullptr, instance->object->vmexecutable[functionid], &addr);
+	script_instance_add_thread(instance, nullptr, instance->object->funcs[functionid], &addr);
 
 	close_debug();
 }
@@ -1904,6 +1929,7 @@ void debug_menu::init() {
 	add_debug_menu_entry(root_menu, &progression_entry);
 	add_debug_menu_entry(root_menu, &level_select_entry);
 
+    create_memory_menu(root_menu);
     create_entity_animation_menu(root_menu);
 
 	debug_menu_entry show_fps = { "Show FPS", POINTER_BOOL, (void *) 0x975848 };
