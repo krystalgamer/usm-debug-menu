@@ -55,6 +55,9 @@
     <ClInclude Include="entity.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="entity_base_vhandle.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="entity_animation_menu.h" />
   </ItemGroup>
   <ItemGroup>
@@ -106,6 +109,12 @@
     <ClInclude Include="mashable_vector.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="memory.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="memory_menu.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="mission_manager.h" />
   </ItemGroup>
   <ItemGroup>
@@ -149,6 +158,21 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource_partition.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="script_executable.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="script_library_class.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="script_memtrack.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="script_object.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="slab_allocator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="spider_monkey.h" />
