@@ -63,6 +63,11 @@ struct debug_menu_entry {
     float field_20[4] = {0.f, 1.f, 0.1f, 10.f};
     bool m_value_initialized{false};
 
+    std::string get_script_handler()
+    {
+        return std::string {this->text};
+    }
+
     void set_id(int id)
     {
         m_id = id;

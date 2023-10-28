@@ -667,3 +667,322 @@ void create_warp_menu(debug_menu *parent)
     v5.set_game_flags_handler(populate_warp_menu);
     parent->add_entry(&v5);
 }
+
+std::string ngl_render_callback(debug_menu_entry *a2)
+{
+    auto v2 = a2->get_script_handler();
+    auto *v3 = v2.c_str();
+    auto v4 = nglGetDebugFlag(v3);
+    a2->set_ival(v4, true);
+    auto result = entry_render_callback_default(a2);
+    return result;
+}
+
+void ngl_handler(debug_menu_entry *a1)
+{
+    auto v3 = a1->get_ival();
+    auto v1 = a1->get_script_handler();
+    auto *v2 = v1.c_str();
+    nglSetDebugFlag(v2, v3);
+}
+
+void create_ngl_menu(debug_menu *parent)
+{
+    assert(parent != nullptr);
+
+    auto *v22 = create_menu("NGL Debug", debug_menu::sort_mode_t::undefined);
+
+    auto *v133 = v22;
+    auto *v23 = create_menu_entry(v133);
+
+    parent->add_entry(v23);
+    if ( nglGetDebugFlagPtr("ShowPerfInfo") != nullptr ) {
+        auto *v24 = create_menu_entry(mString {"ShowPerfInfo"});
+
+        auto v1 = nglGetDebugFlag("ShowPerfInfo");
+        v24->set_ival(v1);
+        v24->set_min_value(0.0);
+        v24->set_max_value(2.0);
+        v24->set_game_flags_handler(ngl_handler);
+        v24->set_render_cb(ngl_render_callback);
+        v133->add_entry(v24);
+    }
+
+    if ( nglGetDebugFlagPtr("ScreenShot") != nullptr )
+    {
+        auto *v25 = create_menu_entry(mString {"ScreenShot"});
+        auto v2 = nglGetDebugFlag("ScreenShot");
+        v25->set_ival(v2);
+        v25->set_min_value(0.0);
+        v25->set_max_value(1.0);
+        v25->set_game_flags_handler(ngl_handler);
+        v25->set_render_cb(ngl_render_callback);
+        v133->add_entry(v25);
+    }
+
+    if ( nglGetDebugFlagPtr("DisableQuads") != nullptr )
+    {
+        auto *v26 = create_menu_entry(mString {"DisableQuads"});
+
+        auto v3 = nglGetDebugFlag("DisableQuads");
+        v26->set_ival(v3);
+        v26->set_min_value(0.0);
+        v26->set_max_value(1.0);
+        v26->set_game_flags_handler(ngl_handler);
+        v26->set_render_cb(ngl_render_callback);
+        v133->add_entry(v26);
+    }
+
+    if ( nglGetDebugFlagPtr("DisableVSync") != nullptr )
+    {
+        auto *v27 = create_menu_entry(mString {"DisableVSync"});
+        auto v4 = nglGetDebugFlag("DisableVSync");
+        v27->set_ival(v4);
+        v27->set_min_value(0.0);
+        v27->set_max_value(1.0);
+        v27->set_game_flags_handler(ngl_handler);
+        v27->set_render_cb(ngl_render_callback);
+        v133->add_entry(v27);
+    }
+
+    if ( nglGetDebugFlagPtr("DisableScratch") != nullptr )
+    {
+        auto *v28 = create_menu_entry(mString{"DisableScratch"});
+        auto v5 = nglGetDebugFlag("DisableScratch");
+        v28->set_ival(v5);
+        v28->set_min_value(0.0);
+        v28->set_max_value(1.0);
+        v28->set_game_flags_handler(ngl_handler);
+        v28->set_render_cb(ngl_render_callback);
+        v133->add_entry(v28);
+    }
+
+    if ( nglGetDebugFlagPtr("DebugPrints") != nullptr )
+    {
+        auto *v29 = create_menu_entry("DebugPrints");
+
+        auto v6 = nglGetDebugFlag("DebugPrints");
+        v29->set_ival(v6);
+        v29->set_min_value(0.0);
+        v29->set_max_value(1.0);
+        v29->set_game_flags_handler(ngl_handler);
+        v29->set_render_cb(ngl_render_callback);
+        v133->add_entry(v29);
+    }
+
+    if ( nglGetDebugFlagPtr("DumpFrameLog") != nullptr )
+    {
+        auto *v30 = create_menu_entry(mString{"DumpFrameLog"});
+        auto v7 = nglGetDebugFlag("DumpFrameLog");
+        v30->set_ival(v7);
+        v30->set_min_value(0.0);
+        v30->set_max_value(1.0);
+        v30->set_game_flags_handler(ngl_handler);
+        v30->set_render_cb(ngl_render_callback);
+        v133->add_entry(v30);
+    }
+
+    if ( nglGetDebugFlagPtr("DumpSceneFile") != nullptr )
+    {
+        auto *v31 = create_menu_entry("DumpSceneFile");
+        auto v8 = nglGetDebugFlag("DumpSceneFile");
+        v31->set_ival(v8);
+        v31->set_min_value(0.0);
+        v31->set_max_value(1.0);
+        v31->set_game_flags_handler(ngl_handler);
+        v31->set_render_cb(ngl_render_callback);
+        v133->add_entry(v31);
+    }
+
+    if ( nglGetDebugFlagPtr("DumpTextures") != nullptr )
+    {
+        auto *v32 = create_menu_entry("DumpTextures");
+        auto v9 = nglGetDebugFlag("DumpTextures");
+        v32->set_ival(v9);
+        v32->set_min_value(0.0);
+        v32->set_max_value(1.0);
+        v32->set_game_flags_handler(ngl_handler);
+        v32->set_render_cb(ngl_render_callback);
+        v133->add_entry(v32);
+    }
+
+    if ( nglGetDebugFlagPtr("DrawLightSpheres") != nullptr )
+    {
+        auto *v33 = create_menu_entry("DrawLightSpheres");
+        auto v10 = nglGetDebugFlag("DrawLightSpheres");
+        v33->set_ival(v10);
+        v33->set_min_value(0.0);
+        v33->set_max_value(1.0);
+        v33->set_game_flags_handler(ngl_handler);
+        v33->set_render_cb(ngl_render_callback);
+        v133->add_entry(v33);
+    }
+
+    if ( nglGetDebugFlagPtr("DrawMeshSpheres") != nullptr )
+    {
+        auto *v34 = create_menu_entry(mString{"DrawMeshSpheres"});
+
+        auto v11 = nglGetDebugFlag("DrawMeshSpheres");
+        v34->set_ival(v11);
+        v34->set_min_value(0.0);
+        v34->set_max_value(1.0);
+        v34->set_game_flags_handler(ngl_handler);
+        v34->set_render_cb(ngl_render_callback);
+        v133->add_entry(v34);
+    }
+
+    if ( nglGetDebugFlagPtr("DisableDuplicateMaterialWarning") != nullptr )
+    {
+        auto *v35 = create_menu_entry(mString{"DisableDuplicateMaterialWarning"});
+        auto v12 = nglGetDebugFlag("DisableDuplicateMaterialWarning");
+        v35->set_ival(v12);
+        v35->set_min_value(0.0);
+        v35->set_max_value(1.0);
+        v35->set_game_flags_handler(ngl_handler);
+        v35->set_render_cb(ngl_render_callback);
+        v133->add_entry(v35);
+    }
+
+    if ( nglGetDebugFlagPtr("DisableMissingTextureWarning") != nullptr )
+    {
+        auto *v36 = create_menu_entry(mString{"DisableMissingTextureWarning"});
+        auto v13 = nglGetDebugFlag("DisableMissingTextureWarning");
+        v36->set_ival(v13);
+        v36->set_min_value(0.0);
+        v36->set_max_value(1.0);
+        v36->set_game_flags_handler(ngl_handler);
+        v36->set_render_cb(ngl_render_callback);
+        v133->add_entry(v36);
+    }
+
+    if ( nglGetDebugFlagPtr("DisableMipOpt") != nullptr )
+    {
+        auto *v37 = create_menu_entry(mString{"DisableMipOpt"});
+
+        auto v14 = nglGetDebugFlag("DisableMipOpt");
+        v37->set_ival(v14);
+        v37->set_min_value(0.0);
+        v37->set_max_value(1.0);
+        v37->set_game_flags_handler(ngl_handler);
+        v37->set_render_cb(ngl_render_callback);
+        v133->add_entry(v37);
+    }
+
+    if ( nglGetDebugFlagPtr("DisableFSAA") != nullptr )
+    {
+        auto *v38 = create_menu_entry(mString{"DisableFSAA"});
+
+        auto v15 = nglGetDebugFlag("DisableFSAA");
+        v38->set_ival(v15);
+        v38->set_min_value(0.0);
+        v38->set_max_value(1.0);
+        v38->set_game_flags_handler(ngl_handler);
+        v38->set_render_cb(ngl_render_callback);
+        v133->add_entry(v38);
+    }
+
+    if ( nglGetDebugFlagPtr("DrawToFrontBuffer") != nullptr )
+    {
+        auto *v39 = create_menu_entry(mString{"DrawToFrontBuffer"});
+
+        auto v16 = nglGetDebugFlag("DrawToFrontBuffer");
+        v39->set_ival(v16);
+        v39->set_min_value(0.0);
+        v39->set_max_value(1.0);
+        v39->set_game_flags_handler(ngl_handler);
+        v39->set_render_cb(ngl_render_callback);
+        v133->add_entry(v39);
+    }
+
+    if ( nglGetDebugFlagPtr("SyncRender") != nullptr )
+    {
+        auto *v40 = create_menu_entry(mString{"SyncRender"});
+
+        auto v17 = nglGetDebugFlag("SyncRender");
+        v40->set_ival(v17);
+        v40->set_min_value(0.0);
+        v40->set_max_value(1.0);
+        v40->set_game_flags_handler(ngl_handler);
+        v40->set_render_cb(ngl_render_callback);
+        v133->add_entry(v40);
+    }
+
+    if ( nglGetDebugFlagPtr("RenderSingleNode") != nullptr )
+    {
+        auto *v41 = create_menu_entry(mString{"RenderSingleNode"});
+        auto v18 = nglGetDebugFlag("RenderSingleNode");
+        v41->set_ival(v18);
+        v41->set_min_value(0.0);
+        v41->set_max_value(1.0);
+        v41->set_game_flags_handler(ngl_handler);
+        v41->set_render_cb(ngl_render_callback);
+        v133->add_entry(v41);
+    }
+
+    if ( nglGetDebugFlagPtr("ShowPerfGraph") != nullptr )
+    {
+        auto *v42 = create_menu_entry(mString{"ShowPerfGraph"});
+        auto v19 = nglGetDebugFlag("ShowPerfGraph");
+        v42->set_ival(v19);
+        v42->set_min_value(0.0);
+        v42->set_max_value(1.0);
+        v42->set_game_flags_handler(ngl_handler);
+        v42->set_render_cb(ngl_render_callback);
+        v133->add_entry(v42);
+    }
+
+    if ( nglGetDebugFlagPtr("RenderTargetShot") != nullptr )
+    {
+        auto *v43 = create_menu_entry(mString{"RenderTargetShot"});
+
+        auto v20 = nglGetDebugFlag("RenderTargetShot");
+        v43->set_ival(v20);
+        v43->set_min_value(0.0);
+        v43->set_max_value(1.0);
+        v43->set_game_flags_handler(ngl_handler);
+        v43->set_render_cb(ngl_render_callback);
+        v133->add_entry(v43);
+    }
+
+    if ( nglGetDebugFlagPtr("WarningLevel") != nullptr )
+    {
+        auto *v44 = create_menu_entry(mString{"WarningLevel"});
+
+        auto v21 = nglGetDebugFlag("WarningLevel");
+        v44->set_ival(v21);
+        v44->set_min_value(0.0);
+        v44->set_max_value(1.0);
+        v44->set_game_flags_handler(ngl_handler);
+        v44->set_render_cb(ngl_render_callback);
+        v133->add_entry(v44);
+    }
+}
+
+void create_debug_render_menu(debug_menu *parent)
+{
+    assert(parent != nullptr);
+
+    auto *v10 = create_menu("Debug Render", debug_menu::sort_mode_t::ascending);
+
+    auto *v4 = create_menu_entry(v10);
+    parent->add_entry(v4);
+
+#if 0
+    for ( auto i = 0u; i < 51u; ++i ) {
+        auto *v5 = create_menu_entry((debug_render_items_names())[i]);
+        v5->set_id(i);
+        v5->set_ival(debug_render_items()[i]);
+        v5->set_p_ival(&debug_render_items()[i]);
+
+        auto v1 = debug_render_get_min((debug_render_items_e)i);
+        v5->set_min_value((float)v1);
+
+        auto v2 = debug_render_get_max((debug_render_items_e)i);
+        v5->set_max_value((float)v2);
+
+        v10->add_entry(v5);
+    }
+#endif
+
+    create_ngl_menu(v10);
+}

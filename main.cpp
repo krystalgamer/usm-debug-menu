@@ -287,30 +287,11 @@ unsigned int nglColor(int r, int g, int b, int a)
     return ( (a << 24) |  (r << 16) | (g << 8) | (b & 255) );
 }
 
-typedef struct {
-	BYTE unk[100];
-} nglQuad;
-
-typedef void (*nglInitQuad_ptr)(void*);
-nglInitQuad_ptr nglInitQuad = (nglInitQuad_ptr)0x0077AC40;
-
-typedef void (*nglSetQuadRect_ptr)(void*, float, float, float, float);
-nglSetQuadRect_ptr nglSetQuadRect = (nglSetQuadRect_ptr) 0x0077AD30;
-
-typedef void (*nglSetQuadColor_ptr)(void*, unsigned int);
-nglSetQuadColor_ptr nglSetQuadColor = (nglSetQuadColor_ptr) 0x0077AD10;
-
-typedef void (*nglListAddQuad_ptr)(void*);
-nglListAddQuad_ptr nglListAddQuad = (nglListAddQuad_ptr) 0x0077AFE0;
-
 typedef int (*nglListBeginScene_ptr)(int);
 nglListBeginScene_ptr nglListBeginScene = (nglListBeginScene_ptr) 0x0076C970;
 
 typedef void (*nglListEndScene_ptr)();
 nglListEndScene_ptr nglListEndScene = (nglListEndScene_ptr) 0x00742B50;
-
-typedef void (*nglSetQuadZ_ptr)(void*, float);
-nglSetQuadZ_ptr nglSetQuadZ = (nglSetQuadZ_ptr) 0x0077AD70;
 
 typedef void (*nglSetClearFlags_ptr)(int);
 nglSetClearFlags_ptr nglSetClearFlags = (nglSetClearFlags_ptr) 0x00769DB0;
@@ -335,9 +316,6 @@ void aeps_RenderAll() {
 
 int debug_enabled = 0;
 uint32_t keys[256];
-
-typedef int (*nglGetStringDimensions_ptr)(void *, const char* EndPtr, int*, int*, float, float);
-nglGetStringDimensions_ptr nglGetStringDimensions = (nglGetStringDimensions_ptr) 0x007798E0;
 
 void getStringDimensions(const char* str, int* width, int* height) {
 	nglGetStringDimensions(*nglSysFont, str, width, height, 1.0, 1.0);
@@ -1348,6 +1326,8 @@ void install_patches() {
         HookFunc(0x005AC347, (DWORD) hook_controlfp, 0, "Patching call to controlfp");
     }
 
+    ngl_patch();
+
     game_patch();
 
     slab_allocator_patch();
@@ -1929,6 +1909,7 @@ void debug_menu::init() {
 	add_debug_menu_entry(root_menu, &progression_entry);
 	add_debug_menu_entry(root_menu, &level_select_entry);
 
+    create_debug_render_menu(root_menu);
     create_memory_menu(root_menu);
     create_entity_animation_menu(root_menu);
 
