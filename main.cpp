@@ -287,9 +287,6 @@ unsigned int nglColor(int r, int g, int b, int a)
     return ( (a << 24) |  (r << 16) | (g << 8) | (b & 255) );
 }
 
-typedef int (*nglListBeginScene_ptr)(int);
-nglListBeginScene_ptr nglListBeginScene = (nglListBeginScene_ptr) 0x0076C970;
-
 typedef void (*nglListEndScene_ptr)();
 nglListEndScene_ptr nglListEndScene = (nglListEndScene_ptr) 0x00742B50;
 
@@ -1277,6 +1274,13 @@ DWORD* __fastcall get_info_node_hook(void* self, void* edx, int a2, char a3) {
 	return res;
 }
 
+void init_shadow_targets()
+{
+    debug_menu::init();
+
+    CDECL_CALL(0x00592E80);
+}
+
 
 typedef void (__fastcall* resource_pack_streamer_load_internal_ptr)(void* self, void* edx, char* str, int a3, int a4, int a5);
 resource_pack_streamer_load_internal_ptr resource_pack_streamer_load_internal = (resource_pack_streamer_load_internal_ptr) 0x0054C580;
@@ -1325,6 +1329,8 @@ void install_patches() {
 
         HookFunc(0x005AC347, (DWORD) hook_controlfp, 0, "Patching call to controlfp");
     }
+
+    REDIRECT(0x005E10EE, init_shadow_targets);
 
     ngl_patch();
 
@@ -1949,7 +1955,6 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID reserverd) {
 		}
 #endif
 
-        debug_menu::init();
 		set_text_writeable();
 		set_rdata_writeable();
 		install_patches();

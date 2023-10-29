@@ -958,16 +958,36 @@ void create_ngl_menu(debug_menu *parent)
     }
 }
 
+inline Var<mString [51]> debug_render_items_names {0x00961168};
+
+inline Var<int [51]> debug_render_items {0x00960D30};
+
+enum debug_render_items_e {};
+
+int debug_render_get_min(int a1)
+{
+    static Var<int [51]> min_values {0x009617A0};
+
+    return min_values()[a1];
+}
+
+int debug_render_get_max(int a1)
+{
+    static Var<int [51]> max_values {0x009227E8};
+    return max_values()[a1];
+}
+
 void create_debug_render_menu(debug_menu *parent)
 {
+    printf("create_debug_render_menu\n");
+
     assert(parent != nullptr);
 
-    auto *v10 = create_menu("Debug Render", debug_menu::sort_mode_t::ascending);
+    auto *debug_render_menu = create_menu("Debug Render", debug_menu::sort_mode_t::ascending);
 
-    auto *v4 = create_menu_entry(v10);
+    auto *v4 = create_menu_entry(debug_render_menu);
     parent->add_entry(v4);
 
-#if 0
     for ( auto i = 0u; i < 51u; ++i ) {
         auto *v5 = create_menu_entry((debug_render_items_names())[i]);
         v5->set_id(i);
@@ -980,9 +1000,8 @@ void create_debug_render_menu(debug_menu *parent)
         auto v2 = debug_render_get_max((debug_render_items_e)i);
         v5->set_max_value((float)v2);
 
-        v10->add_entry(v5);
+        debug_render_menu->add_entry(v5);
     }
-#endif
 
-    create_ngl_menu(v10);
+    create_ngl_menu(debug_render_menu);
 }

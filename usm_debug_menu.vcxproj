@@ -190,6 +190,9 @@
     <ClInclude Include="variable.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="variables.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="vtbl.h" />
   </ItemGroup>
   <ItemGroup>

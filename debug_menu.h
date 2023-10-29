@@ -369,7 +369,7 @@ struct debug_menu_entry {
         strncpy(this->text, p_text, MAX_CHARS_SAFE);
     }
 
-    debug_menu_entry(const mString &p_text) : entry_type(UNDEFINED), data(nullptr)
+    debug_menu_entry(const mString &p_text) : debug_menu_entry(p_text.c_str())
     {
         strncpy(this->text, p_text.c_str(), MAX_CHARS_SAFE);
     }

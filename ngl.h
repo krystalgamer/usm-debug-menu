@@ -3,7 +3,7 @@
 #include "float.hpp"
 #include "func_wrapper.h"
 #include "utility.h"
-#include "variable.h"
+#include "variables.h"
 
 #include <psapi.h>
 #include <windows.h>
@@ -43,6 +43,10 @@ VALIDATE_SIZE(nglDebug_t, 0x28);
 
 inline Var<nglDebug_t> nglDebug {0x00975830};
 inline Var<nglDebug_t> nglSyncDebug {0x009758E0};
+
+LARGE_INTEGER query_perf_counter();
+
+void nglQueueFlip();
 
 struct nglPerfomanceInfo
 {
@@ -88,6 +92,114 @@ struct nglQuad {
 };
 
 VALIDATE_SIZE(nglQuad, 0x64);
+
+struct nglVertexBuffer
+{
+    union {
+        IDirect3DIndexBuffer9 *m_indexBuffer;
+        struct
+        {
+            int pad;
+            uint32_t field_4;
+            IDirect3DVertexBuffer9 *m_vertexBuffer;
+        };
+    };
+};
+
+VALIDATE_SIZE(nglVertexBuffer, 0xC);
+
+struct nglScratchBuffer_t
+{
+    nglVertexBuffer field_0[2];
+    IDirect3DIndexBuffer9 *field_18[2];
+    int16_t *field_20;
+    int field_24;
+    int field_28;
+    int field_2C;
+    int field_30;
+    int field_34;
+    int field_38;
+    int field_3C;
+    int field_40;
+    int field_44;
+    IDirect3DIndexBuffer9 *field_48;
+    nglVertexBuffer field_4C;
+};
+
+VALIDATE_SIZE(nglScratchBuffer_t, 0x58);
+
+inline Var<nglScratchBuffer_t> nglScratchBuffer {0x00972A18};
+
+struct nglScene {};
+
+inline Var<nglScene *> nglCurScene {0x00971F00};
+
+inline Var<nglScene *> nglRootScene {0x00971F04};
+
+enum nglSceneParamType {};
+
+inline Var<const float> PCFreq {0x0093A294};
+
+enum nglFrameLockType {};
+
+inline Var<nglFrameLockType> nglFrameLock {0x0093AED0};
+
+inline Var<int> nglFrameLockImmediate {0x00972668};
+
+inline Var<int> nglVBlankCount{0x00972908};
+
+inline Var<int> nglLastFlipVBlank{0x00972670};
+
+inline Var<int> nglFrameVBlankCount = (0x0097290C);
+
+inline Var<DWORD> nglFlipCycle{0x00972674};
+
+inline Var<DWORD> nglLastFlipCycle{0x00972678};
+
+struct nglLightContext {};
+
+inline Var<nglLightContext *> nglDefaultLightContext {0x00973B70};
+
+inline Var<BOOL> nglFlipQueued = {0x00972668};
+
+inline Var<char *> nglListWork {0x00971F08};
+
+inline Var<int> dword_975308 {0x00975308};
+
+inline Var<int> dword_975314 {0x00975314};
+
+inline Var<int> dword_97530C {0x0097530C};
+
+inline Var<int> nglScratchMeshPos {0x00975310};
+
+void nglScreenShot(const char *a1)
+{
+    CDECL_CALL(0x007731D0, a1);
+}
+
+void nglVif1RenderScene()
+{
+    CDECL_CALL(0x0077D060);
+}
+
+void sub_781A30()
+{
+    ;
+}
+
+void sub_76DE60()
+{
+    nglPerfInfo().field_28 = query_perf_counter();
+}
+
+inline Var<float> g_renderTime {0x00972664};
+
+void sub_76DE80()
+{
+    nglPerfInfo().field_30 = query_perf_counter();
+    g_renderTime() = (nglPerfInfo().field_30.QuadPart - nglPerfInfo().field_28.QuadPart) / PCFreq();
+    nglQueueFlip();
+}
 
 void nglInitQuad(nglQuad *Quad)
 {
@@ -206,7 +318,6 @@ void nglSetDebugFlag(const char *Flag, uint8_t Set)
     nglSyncDebug() = nglDebug();
 }
 
-
 Var<nglFont *> nglSysFont{0x00975208};
 
 void nglListAddString(nglFont *font, const char *a2, Float a3, Float a4, Float z_value, int a6, Float a7, Float a8)
@@ -267,21 +378,6 @@ size_t sub_74A650()
     return v0;
 }
 
-inline Var<int> nglFlipCycle {0x00972674};
-inline Var<int> nglLastFlipCycle {0x00972678};
-
-enum nglFrameLockType {};
-
-inline Var<nglFrameLockType> nglFrameLock {0x0093AED0};
-
-inline Var<int> nglVBlankCount {0x00972908};
-
-inline Var<bool> nglFlipQueued {0x0097267C};
-
-inline Var<int> nglLastFlipVBlank {0x00972670};
-
-inline Var<int> nglFrameLockImmediate {0x00972668};
-
 LARGE_INTEGER query_perf_counter()
 {
     LARGE_INTEGER PerformanceCount;
@@ -300,6 +396,23 @@ void sub_76DD70()
     printf("nglFlipCycle = %d, nglLastFlipCycle = %d\n", nglFlipCycle(), nglLastFlipCycle());
 }
 
+void sub_76DE00()
+{
+    ++nglVBlankCount();
+    if ( nglFlipQueued() ) {
+        if (nglVBlankCount() - nglLastFlipVBlank() >= nglFrameLock() ) {
+            sub_76DD70();
+        }
+    }
+}
+
+void nglInit(HWND hWnd)
+{
+    printf("nglInit\n");
+
+    CDECL_CALL(0x0076E3E0, hWnd);
+}
+
 void nglSetFrameLock(nglFrameLockType a2)
 {
     printf("nglSetFrameLock\n");
@@ -313,15 +426,18 @@ void nglQueueFlip()
             nglFrameLock(), nglVBlankCount(), nglLastFlipVBlank(), nglFrameLockImmediate() );
 
     if (0
-        //nglFrameLock()
-        && (!nglFrameLockImmediate() || nglVBlankCount() - nglLastFlipVBlank() < (unsigned int)nglFrameLock() ) )
+        //nglFrameLock() )
+        )
     {
-        nglFlipQueued() = true;
+        if (nglFrameLockImmediate() == 0
+                || (nglVBlankCount() - nglLastFlipVBlank()) < (uint32_t) nglFrameLock() )
+        {
+            nglFlipQueued() = true;
+            return;
+        }
     }
-    else
-    {
-        sub_76DD70();
-    }
+
+    sub_76DD70();
 }
 
 void nglRenderPerfInfo()
@@ -385,32 +501,18 @@ void nglRenderPerfInfo()
         float v3 = (630 - a3);
         nglListAddString(nglSysFont(), Dest, v3, 20.0, -9999.0, -1, 1.0, 1.0);
     } else {
-
-        if (nglSyncDebug().ShowPerfInfo == 1) {
-            float v1 = (nglFlipCycle() - nglLastFlipCycle()) / 733333.31;
-            printf("%f %f %f\n", nglSyncPerfInfo().m_fps, nglSyncPerfInfo().field_6C, v1);
-        }
-
         CDECL_CALL(0x0076E0E0);
-
-        nglQueueFlip();
     }
 }
 
-BOOL sub_76D1C0()
+void PumpMessages()
 {
-    BOOL result;
     struct tagMSG Msg;
 
-    for ( result = PeekMessageA(&Msg, 0, 0, 0, 1u);
-            result;
-            result = PeekMessageA(&Msg, 0, 0, 0, 1u) )
-    {
+    while ( PeekMessageA(&Msg, 0, 0, 0, PM_REMOVE) ) {
         TranslateMessage(&Msg);
         DispatchMessageA(&Msg);
     }
-
-    return result;
 }
 
 int __fastcall sub_781EA0(void *a1)
@@ -419,9 +521,69 @@ int __fastcall sub_781EA0(void *a1)
     return func(a1);
 }
 
-void sub_76E800()
+void Reset3DDevice()
 {
     CDECL_CALL(0x0076E800);
+}
+
+nglScene *nglListBeginScene(nglSceneParamType a1)
+{
+    return (nglScene *) CDECL_CALL(0x0076C970, a1);
+}
+
+void nglSceneDumpStart()
+{
+    ;
+}
+
+nglLightContext *nglCreateLightContext()
+{
+    return (nglLightContext *) CDECL_CALL(0x00775EC0);
+}
+
+void nglListInit()
+{
+    printf("nglListInit\n");
+
+    if constexpr (1) {
+        nglFrameVBlankCount() = nglVBlankCount();
+        nglPerfInfo().field_38 = query_perf_counter();
+        nglListWorkPos() = bit_cast<int>(nglListWork());
+        nglDefaultLightContext() = nglCreateLightContext();
+        if ( nglSyncDebug().DumpFrameLog ) {
+            nglDebug().DumpFrameLog = 0;
+        }
+
+        if ( nglSyncDebug().DumpMesh ) {
+            nglDebug().DumpMesh = 0;
+        }
+
+        if ( nglSyncDebug().DumpTextures ) {
+            nglDebug().DumpTextures = 0;
+        }
+
+        nglSyncDebug() = nglDebug();
+        nglCurScene() = nullptr;
+        nglListBeginScene(static_cast<nglSceneParamType>(0));
+        nglSceneDumpStart();
+        auto *v3 = (int16_t *)&nglScratchBuffer().field_0[0].pad;
+        auto v0 = nglScratchBuffer().field_44;
+        nglScratchBuffer().field_4C = nglScratchBuffer().field_0[v0];
+
+        nglScratchBuffer().field_48 = (IDirect3DIndexBuffer9 *)nglScratchBuffer().field_18[v0];
+        if ( nglScratchBuffer().field_4C.m_vertexBuffer != nullptr ) {
+            nglScratchBuffer().field_4C.m_vertexBuffer->Lock(0, 0, (void **)&v3, D3DLOCK_DISCARD);
+            nglScratchBuffer().field_4C.pad = (int)v3;
+        }
+
+        auto *v2 = nglScratchBuffer().field_48;
+        if ( v2 != nullptr ) {
+            v2->Lock(0, 0, (void **)&v3, 0);
+            nglScratchBuffer().field_20 = v3;
+        }
+    } else {
+        CDECL_CALL(0x0076E050);
+    }
 }
 
 inline Var<bool> byte_971F9C {0x00971F9C};
@@ -434,40 +596,193 @@ void nglFlip(bool a1)
 
     ++nglVBlankCount();
 
-    static Var<IDirect3DDevice9 *> g_Direct3DDevice {0x00971F94};
     g_Direct3DDevice()->BeginScene();
-
-    void *v1 = nullptr;
-    sub_781EA0(v1);
+    sub_781EA0(nullptr);
     g_Direct3DDevice()->EndScene();
+
     if ( !byte_971F9C()
-            && g_Direct3DDevice()->Present(0, 0, 0, 0) == 0x88760868 )
+            && g_Direct3DDevice()->Present(0, 0, 0, 0) == D3DERR_DEVICELOST )
     {
-        Sleep(0x64u);
-        if ( g_Direct3DDevice()->TestCooperativeLevel() == 0x88760869 ) {
-            sub_76E800();
+        Sleep(100u);
+        if ( g_Direct3DDevice()->TestCooperativeLevel() == D3DERR_DEVICENOTRESET ) {
+            Reset3DDevice();
         }
     }
 
-    sub_76D1C0();
+    PumpMessages();
     ++nglFrame();
     if ( a1 ) {
         nglQueueFlip();
     }
 }
 
-void nglListSend(bool a1)
+void nglRenderPerfBar()
 {
-    //nglRenderDebug();
-    CDECL_CALL(0x0076EA10, a1);
+    CDECL_CALL(0x0077ECF0);
+}
+
+void nglRenderDebug()
+{
+    if ( nglSyncDebug().ShowPerfInfo ) {
+        nglRenderPerfInfo();
+    }
+
+    if ( nglSyncDebug().ShowPerfBar ) {
+        nglRenderPerfBar();
+    }
+}
+
+void nglListSend(bool Flip)
+{
+    printf("nglListSend\n");
+
+    if constexpr (1) {
+        if ( EnableShader() ) {
+            float v10[4] {0, 0, 1, 1};
+            g_Direct3DDevice()->SetVertexShaderConstantF(90, v10, 1);
+        }
+
+        nglRenderDebug();
+
+        sub_76DE60();
+#if 0
+        if (nglCurScene() != nglRootScene()) {
+            error("nglListSend called while one or more scenes were still active (need to call nglListEndScene).\n");
+        }
+#endif
+
+        nglPerfInfo().field_28 = query_perf_counter();
+
+        auto v3 = []() {
+            auto perf_counter = query_perf_counter();
+            LARGE_INTEGER v3 = bit_cast<LARGE_INTEGER>(*(uint64_t *)&perf_counter - nglPerfInfo().field_38.QuadPart);
+            return v3;
+        }();
+
+        nglPerfInfo().field_38 = v3;
+        nglPerfInfo().field_74 = v3.QuadPart / PCFreq();
+        nglPerfInfo().field_40 = query_perf_counter();
+        nglScratchBuffer().field_44 ^= 1u;
+        nglScratchBuffer().field_28 = 0;
+        nglScratchBuffer().field_2C = 0;
+        nglScratchBuffer().field_24 = 0;
+        nglScratchBuffer().field_30 = 0;
+
+        nglScratchBuffer().field_4C.m_vertexBuffer->Unlock();
+        nglScratchBuffer().field_48->Unlock();
+
+        nglCurScene() = nglRootScene();
+
+        g_Direct3DDevice()->BeginScene();
+        nglVif1RenderScene();
+        g_Direct3DDevice()->EndScene();
+
+        sub_781A30();
+
+        sub_76DE80();
+
+        auto v5 = 1.f / PCFreq();
+        printf("PCFreq = %f\n", PCFreq());
+        nglPerfInfo().field_40.QuadPart = query_perf_counter().QuadPart - nglPerfInfo().field_40.QuadPart;
+        nglPerfInfo().field_70 = nglPerfInfo().field_40.QuadPart * v5;
+        auto v6 = dword_975308();
+        nglPerfInfo().field_18 = nglPerfInfo().field_48 * v5;
+        nglPerfInfo().field_1C = nglPerfInfo().field_50 * v5;
+        if ( dword_975314() == dword_975308() ) {
+            v6 = dword_97530C();
+        }
+
+        dword_975314() = v6;
+        nglScratchMeshPos() = v6;
+
+        //dword_972AB4 = 0;
+        //dword_972ABC = 0;
+
+        g_Direct3DDevice()->SetStreamSource(0, nullptr, 0, 0);
+        g_Direct3DDevice()->SetVertexShader(nullptr);
+        g_Direct3DDevice()->SetPixelShader(nullptr);
+
+#if 0
+        if ( dword_971F24() != nullptr ) {
+            dword_971F24()(dword_971F28());
+        }
+#endif
+
+        float v8 = []() -> double {
+            return query_perf_counter().QuadPart - nglPerfInfo().field_20.QuadPart;
+        }();
+
+        nglPerfInfo().m_cpu_time = v8 / PCFreq();
+
+#if 0
+        if ( dword_971F1C() != nullptr )
+            dword_971F1C()(dword_971F20());
+#endif
+
+        if ( Flip ) {
+            nglFlip(0);
+        }
+
+        nglPerfInfo().field_20 = query_perf_counter();
+        nglPerfInfo().m_render_time = g_renderTime();
+        //sp_log("m_render_time = %f", nglPerfInfo().m_render_time);
+
+        double v9 = nglFlipCycle() - nglLastFlipCycle();
+        if ( (nglFlipCycle() - nglLastFlipCycle()) < 0 ) {
+            v9 += flt_86F860();
+        }
+
+        printf("nglFlipCycle = %u, nglLastFlipCycle = %u\n", nglFlipCycle(), nglLastFlipCycle());
+
+        nglPerfInfo().field_6C = v9 / PCFreq();
+        nglPerfInfo().field_5C += nglPerfInfo().field_6C;
+        nglPerfInfo().m_fps = 1000.f / nglPerfInfo().field_6C;
+
+        printf("v9 = %f, PCFreq = %f\n", v9, PCFreq());
+        printf("nglPerfInfo.m_fps == %f\n", nglPerfInfo().m_fps);
+
+        nglPerfInfo().field_60 = nglPerfInfo().field_5C * 0.001f;
+        if ( nglDebug().ScreenShot ) {
+            nglScreenShot(nullptr);
+            nglDebug().ScreenShot = 0;
+        }
+
+        nglSyncPerfInfo() = nglPerfInfo();
+
+        nglPerfInfo().field_80 = 0;
+        nglPerfInfo().field_18 = 0.0;
+        nglPerfInfo().field_1C = 0.0;
+        nglPerfInfo().field_7C = 0;
+        nglPerfInfo().field_78 = 0;
+        nglPerfInfo().field_48 = 0;
+        nglPerfInfo().field_4C = 0;
+        nglPerfInfo().field_50 = 0;
+        nglPerfInfo().field_54 = 0;
+
+#if 0
+        if ( dword_971F2C() ) {
+            dword_971F2C()(dword_971F30());
+        }
+#endif
+
+        nglCurScene() = nullptr;
+    } else {
+        CDECL_CALL(0x0076EA10, Flip);
+    }
 }
 
 void ngl_patch()
 {
-    REDIRECT(0x005AD264, nglSetFrameLock);
-    REDIRECT(0x0076E966, nglSetFrameLock);
+    {
+        REDIRECT(0x005AD264, nglSetFrameLock);
+        REDIRECT(0x0076E966, nglSetFrameLock);
+    }
 
-    REDIRECT(0x0076ECF3, nglFlip); 
+    REDIRECT(0x005AD218, nglInit);
+
+    SET_JUMP(0x0076E050, nglListInit);
+
+    SET_JUMP(0x0076EA10, nglListSend);
 
     REDIRECT(0x0076EA59, nglRenderPerfInfo);
 }
