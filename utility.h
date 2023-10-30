@@ -5,6 +5,11 @@
 #include "bit.h"
 
 template<typename Func>
+void set_vfunc(std::size_t address, Func func) {
+    (*bit_cast<std::uint32_t *>(address)) = (bit_cast<std::uint32_t>(func));
+}
+
+template<typename Func>
 void SET_JUMP(std::ptrdiff_t addr, Func my_func) {
     *bit_cast<uint8_t *>(addr) = 0xE9; //JUMP
 

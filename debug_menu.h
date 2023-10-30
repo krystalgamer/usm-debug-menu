@@ -445,6 +445,7 @@ struct debug_menu {
 	menu_handler_function handler;
 	debug_menu_entry* entries;
     debug_menu *m_parent {nullptr};
+    sort_mode_t m_sort_mode;
 
     void add_entry(debug_menu_entry *entry);
 
@@ -552,6 +553,36 @@ void* add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 		void* ret = &menu->entries[menu->used_slots];
 		memcpy(ret, entry, sizeof(debug_menu_entry));
 		++menu->used_slots;
+
+        if (entry->entry_type == POINTER_MENU && menu->used_slots > 1) {
+            std::swap(menu->entries[0], menu->entries[menu->used_slots - 1]);
+        }
+
+        if (menu->m_sort_mode != debug_menu::sort_mode_t::undefined ) {
+
+            auto begin = menu->entries;
+            auto end = begin + menu->used_slots;
+            auto find_it = std::find_if(begin, end, [](debug_menu_entry &entry) {
+                return entry.entry_type != POINTER_MENU;
+            });
+
+            if (find_it != end) {
+                auto sort = [mode = menu->m_sort_mode](debug_menu_entry &e0, debug_menu_entry &e1) {
+                    auto v7 = e0.get_script_handler();
+                    auto v2 = e1.get_script_handler();
+                    if (mode == debug_menu::sort_mode_t::ascending) {
+                        return v7 < v2;
+                    } else { //descending
+                        return v7 > v2;
+                    }
+                };
+
+                std::sort(begin, find_it, sort);
+
+                std::sort(find_it, end, sort);
+            }
+        }
+
 		return ret;
 	}
 	else {
@@ -563,9 +594,7 @@ void* add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 		if (new_ptr == nullptr) {
 			printf("RIP\n");
 			__debugbreak();
-		}
-		else {
-
+		} else {
 			menu->capacity += EXTEND_NEW_ENTRIES;
 			menu->entries = static_cast<decltype(menu->entries)>(new_ptr);
 			memset(&menu->entries[menu->used_slots], 0, new_entries_size);
@@ -612,6 +641,8 @@ debug_menu* create_menu(const char* title, debug_menu::sort_mode_t mode = debug_
 	DWORD total_entries_size = sizeof(debug_menu_entry) * capacity;
 	menu->entries = static_cast<decltype(menu->entries)>(malloc(total_entries_size));
 	memset(menu->entries, 0, total_entries_size);
+
+    menu->m_sort_mode = mode;
 
 	return menu;
 }
