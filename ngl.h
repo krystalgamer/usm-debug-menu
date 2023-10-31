@@ -106,8 +106,8 @@ struct nglPerfomanceInfo
     int field_C;
     int field_10;
     int field_14;
-    int field_18;
-    int field_1C;
+    float field_18;
+    float field_1C;
     LARGE_INTEGER field_20;
     LARGE_INTEGER field_28;
     LARGE_INTEGER field_30;
