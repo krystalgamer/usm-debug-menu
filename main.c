@@ -454,7 +454,7 @@ void aeps_RenderAll() {
 	uint8_t green = color_ramp_function(ratio, period, cur_time);
 	uint8_t blue = color_ramp_function(ratio, period, cur_time - 2 * period);
 
-	nglListAddString(*nglSysFont, 0.1f, 0.2f, 0.2f, nglColor(red, green, blue, 255), 1.f, 1.f, "Krystalgamer's Cool menu");
+	nglListAddString(*nglSysFont, 0.1f, 0.2f, 0.2f, nglColor(red, green, blue, 255), 1.f, 1.f, "Krystalgamer's Debug menu");
 
 	cur_time = (cur_time + 1) % duration;
 
@@ -900,11 +900,11 @@ void district_variant_string_generator(debug_menu_entry* entry) {
 	int old_variant = (int)entry->data1;
 	int current_variant = region_get_district_variant(entry->data);
 
-	char* region_name = region_get_name(entry->data);
 	if (current_variant == old_variant) {
 		return;
 	}
 
+	char* region_name = region_get_name(entry->data);
 
 	snprintf(entry->text, MAX_CHARS,"%s: %d", region_name, current_variant);
 	entry->data1 = (void*)current_variant;
