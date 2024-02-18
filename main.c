@@ -9,8 +9,23 @@
 #pragma comment(lib, "Dinput8.lib")
 #pragma comment(lib, "Dxguid.lib")
 
+
+#define panic(x) {\
+	if (NULL == x) \
+	{ \
+		printf("Quitting as %s is null", #x); \
+		exit(-1); \
+	} \
+}
+
+void* my_malloc(size_t _Size) {
+	void* res = malloc(_Size);
+	panic(res);
+	return res;
+}
+
 void* g_game_ptr = NULL;
-void* g_world_ptr = 0x0095C770;
+void* g_world_ptr = (void*)0x0095C770;
 
 DWORD* ai_current_player = NULL;
 DWORD* fancy_player_ptr = NULL;
@@ -40,7 +55,7 @@ uint8_t color_ramp_function(float ratio, int period_duration, int cur_time) {
 
 		float calc = ratio * cur_time;
 
-		return min(calc, 1.0f) * 255;
+		return (uint8_t)(min(calc, 1.0f) * 255);
 	}
 
 
@@ -54,9 +69,11 @@ uint8_t color_ramp_function(float ratio, int period_duration, int cur_time) {
 		int adjusted_time = cur_time - 3 * period_duration;
 		float calc = 1.f - ratio * adjusted_time;
 
-		return min(calc, 1.0f) * 255;
+		return (uint8_t)(min(calc, 1.0f) * 255);
 	}
 
+	// never reached
+	return 0;
 }
 
 
@@ -106,7 +123,7 @@ typedef enum {
 
 
 struct _debug_menu_entry;
-typedef char* (*custom_string_generator_ptr)(struct _debug_menu_entry* entry);
+typedef void (*custom_string_generator_ptr)(struct _debug_menu_entry* entry);
 
 typedef struct _debug_menu_entry {
 
@@ -175,10 +192,10 @@ void remove_debug_menu_entry(debug_menu_entry* entry) {
 
 		debug_menu *cur = *all_menus[i];
 
-		DWORD start = cur->entries;
+		DWORD start = (DWORD)cur->entries;
 		DWORD end = start + cur->used_slots * sizeof(debug_menu_entry);
 
-		if (start <= entry && entry < end) {
+		if (start <= (DWORD)entry && (DWORD)entry < end) {
 
 
 			int index = (to_be - start) / sizeof(debug_menu_entry);
@@ -191,7 +208,7 @@ void remove_debug_menu_entry(debug_menu_entry* entry) {
 		
 	}
 
-	printf("FAILED TO DEALLOCATE AN ENTRY :S %08X\n", entry);
+	printf("FAILED TO DEALLOCATE AN ENTRY :S %08X\n", (DWORD)entry);
 
 }
 
@@ -203,26 +220,19 @@ void* add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 		menu->used_slots++;
 		return ret;
 	}
-	else {
-		DWORD current_entries_size = sizeof(debug_menu_entry) * menu->capacity;
-		DWORD new_entries_size = sizeof(debug_menu_entry) * EXTEND_NEW_ENTRIES;
+
+	DWORD current_entries_size = sizeof(debug_menu_entry) * menu->capacity;
+	DWORD new_entries_size = sizeof(debug_menu_entry) * EXTEND_NEW_ENTRIES;
 
 
-		void* new_ptr = realloc(menu->entries, current_entries_size + new_entries_size);
+	void* new_ptr = realloc(menu->entries, current_entries_size + new_entries_size);
 
-		if (!new_ptr) {
-			printf("RIP\n");
-			__debugbreak();
-		}
-		else {
+	panic(new_ptr);
+	menu->capacity += EXTEND_NEW_ENTRIES;
+	menu->entries = new_ptr;
+	memset(&menu->entries[menu->used_slots], 0, new_entries_size);
 
-			menu->capacity += EXTEND_NEW_ENTRIES;
-			menu->entries = new_ptr;
-			memset(&menu->entries[menu->used_slots], 0, new_entries_size);
-
-			return add_debug_menu_entry(menu, entry);
-		}
-	}
+	return add_debug_menu_entry(menu, entry);
 }
 
 
@@ -230,7 +240,8 @@ void* add_debug_menu_entry(debug_menu* menu, debug_menu_entry* entry) {
 
 debug_menu* create_menu(const char* title, go_back_function go_back, menu_handler_function function, DWORD capacity) {
 
-	debug_menu* menu = malloc(sizeof(debug_menu));
+	debug_menu* menu = my_malloc(sizeof(debug_menu));
+
 	memset(menu, 0, sizeof(debug_menu));
 
 	strncpy(menu->title, title, MAX_CHARS_SAFE);
@@ -240,7 +251,7 @@ debug_menu* create_menu(const char* title, go_back_function go_back, menu_handle
 	menu->go_back = go_back;
 
 	DWORD total_entries_size = sizeof(debug_menu_entry) * capacity;
-	menu->entries = malloc(total_entries_size);
+	menu->entries = my_malloc(total_entries_size);
 	memset(menu->entries, 0, total_entries_size);
 
 	return menu;
@@ -251,10 +262,10 @@ debug_menu* create_menu(const char* title, go_back_function go_back, menu_handle
 int vm_debug_menu_entry_garbage_collection_id = -1;
 
 typedef int (*script_manager_register_allocated_stuff_callback_ptr)(void* func);
-script_manager_register_allocated_stuff_callback_ptr script_manager_register_allocated_stuff_callback = 0x005AFE40;
+script_manager_register_allocated_stuff_callback_ptr script_manager_register_allocated_stuff_callback = (script_manager_register_allocated_stuff_callback_ptr)0x005AFE40;
 
 typedef int (*construct_client_script_libs_ptr)();
-construct_client_script_libs_ptr construct_client_script_libs = 0x0058F9C0;
+construct_client_script_libs_ptr construct_client_script_libs = (construct_client_script_libs_ptr)0x0058F9C0;
 
 
 void vm_debug_menu_entry_garbage_collection_callback(void* a1, list* lst) {
@@ -282,25 +293,25 @@ int construct_client_script_libs_hook() {
 
 
 typedef (__fastcall* mString_constructor_ptr)(mString* this, void* edx, char* str);
-mString_constructor_ptr mString_constructor = 0x00421100;
+mString_constructor_ptr mString_constructor = (void*)0x00421100;
 
 typedef (__fastcall* mString_finalize_ptr)(mString* this, void* edx, int zero);
-mString_finalize_ptr mString_finalize = 0x004209C0;
+mString_finalize_ptr mString_finalize = (void*)0x004209C0;
 
 
-region** all_regions = 0x0095C924;
-DWORD* number_of_allocated_regions = 0x0095C920;
+region** all_regions = (region**)0x0095C924;
+DWORD* number_of_allocated_regions = (DWORD*)0x0095C920;
 
-typedef (__fastcall* region_get_name_ptr)(void* this);
-region_get_name_ptr region_get_name = 0x00519BB0;
+typedef char* (__fastcall* region_get_name_ptr)(void* this);
+region_get_name_ptr region_get_name = (region_get_name_ptr)0x00519BB0;
 
 
 typedef int (__fastcall *region_get_district_variant_ptr)(region* this);
-region_get_district_variant_ptr region_get_district_variant = 0x005503D0;
+region_get_district_variant_ptr region_get_district_variant = (region_get_district_variant_ptr)0x005503D0;
 
 
 typedef char(__fastcall* terrain_set_district_variant_ptr)(void* this, void* edx, DWORD district_id, int variant, char one);
-terrain_set_district_variant_ptr terrain_set_district_variant = 0x00557480;
+terrain_set_district_variant_ptr terrain_set_district_variant = (terrain_set_district_variant_ptr)0x00557480;
 
 void set_text_writeable() {
 
@@ -320,10 +331,10 @@ void set_rdata_writeable() {
 	VirtualProtect((void*)start, end - start, PAGE_READWRITE, &old);
 }
 
-void HookFunc(DWORD callAdd, DWORD funcAdd, BOOLEAN jump, const unsigned char* reason) {
+void HookFunc(DWORD callAdd, void* funcAdd, BOOLEAN jump, const unsigned char* reason) {
 
 	//Only works for E8/E9 hooks	
-	DWORD jmpOff = funcAdd - callAdd - 5;
+	DWORD jmpOff = (DWORD)funcAdd - callAdd - 5;
 
 	BYTE shellcode[] = { 0, 0, 0, 0, 0 };
 	shellcode[0] = jump ? 0xE9 : 0xE8;
@@ -337,10 +348,10 @@ void HookFunc(DWORD callAdd, DWORD funcAdd, BOOLEAN jump, const unsigned char* r
 }
 
 
-void WriteDWORD(DWORD* address, DWORD newValue, const unsigned char* reason) {
-	*address = newValue;
+void WriteDWORD(DWORD address, void* newValue, const unsigned char* reason) {
+	*(DWORD*)address = (DWORD)newValue;
 	if (reason)
-		printf("Wrote: %08X -  %s\n", address, reason);
+		printf("Wrote: %08X -  %s\n", (DWORD)address, reason);
 }
 
 typedef int (*nflSystemOpenFile_ptr)(HANDLE* hHandle, LPCSTR lpFileName, unsigned int a3, LARGE_INTEGER liDistanceToMove);
@@ -405,30 +416,30 @@ nglInitQuad_ptr nglInitQuad = (void*)0x0077AC40;
 
 
 typedef void (*nglSetQuadRect_ptr)(void*, float, float, float, float);
-nglSetQuadRect_ptr nglSetQuadRect = 0x0077AD30;
+nglSetQuadRect_ptr nglSetQuadRect = (void*)0x0077AD30;
 
 
 typedef void (*nglSetQuadColor_ptr)(void*, unsigned int);
-nglSetQuadColor_ptr nglSetQuadColor = 0x0077AD10;
+nglSetQuadColor_ptr nglSetQuadColor = (void*)0x0077AD10;
 
 
 typedef void (*nglListAddQuad_ptr)(void*);
-nglListAddQuad_ptr nglListAddQuad = 0x0077AFE0;
+nglListAddQuad_ptr nglListAddQuad = (void*)0x0077AFE0;
 
 
 typedef int (*nglListBeginScene_ptr)(int);
-nglListBeginScene_ptr nglListBeginScene = 0x0076C970;
+nglListBeginScene_ptr nglListBeginScene = (void*)0x0076C970;
 
 
 typedef void (*nglListEndScene_ptr)();
-nglListEndScene_ptr nglListEndScene = 0x00742B50;
+nglListEndScene_ptr nglListEndScene = (void*)0x00742B50;
 
 
 typedef void (*nglSetQuadZ_ptr)(void*, float);
-nglSetQuadZ_ptr nglSetQuadZ = 0x0077AD70;
+nglSetQuadZ_ptr nglSetQuadZ = (void*)0x0077AD70;
 
 typedef void (*nglSetClearFlags_ptr)(int);
-nglSetClearFlags_ptr nglSetClearFlags = 0x00769DB0;
+nglSetClearFlags_ptr nglSetClearFlags = (void*)0x00769DB0;
 
 void aeps_RenderAll() {
 
@@ -443,7 +454,7 @@ void aeps_RenderAll() {
 	uint8_t green = color_ramp_function(ratio, period, cur_time);
 	uint8_t blue = color_ramp_function(ratio, period, cur_time - 2 * period);
 
-	nglListAddString(*nglSysFont, 0.1f, 0.2f, 0.2f, nglColor(red, green, blue, 255), 1.f, 1.f, "Krystalgamer's Debug menu");
+	nglListAddString(*nglSysFont, 0.1f, 0.2f, 0.2f, nglColor(red, green, blue, 255), 1.f, 1.f, "Krystalgamer's Cool menu");
 
 	cur_time = (cur_time + 1) % duration;
 
@@ -459,8 +470,8 @@ uint32_t keys[256];
 
 
 
-typedef int (*nglGetStringDimensions_ptr)(int, char* EndPtr, int*, int*, float, float);
-nglGetStringDimensions_ptr nglGetStringDimensions = 0x007798E0;
+typedef int (*nglGetStringDimensions_ptr)(void*, char* EndPtr, int*, int*, float, float);
+nglGetStringDimensions_ptr nglGetStringDimensions = (void*)0x007798E0;
 
 
 
@@ -486,8 +497,7 @@ char* getRealText(debug_menu_entry* entry, char* str) {
 	}
 
 	if (entry->entry_type == CUSTOM) {
-
-		return entry->custom_string_generator(entry);
+		entry->custom_string_generator(entry);
 	}
 
 
@@ -547,7 +557,7 @@ void render_current_debug_menu() {
 	int menu_x_pad = 24, menu_y_pad = 18;
 
 	nglInitQuad(&quad);
-	nglSetQuadRect(&quad, menu_x_start, menu_y_start, menu_x_start + debug_width + menu_x_pad, menu_y_start + debug_height + menu_y_pad);
+	nglSetQuadRect(&quad, (float)menu_x_start, (float)menu_y_start, (float)(menu_x_start + debug_width + menu_x_pad), (float)(menu_y_start + debug_height + menu_y_pad));
 	nglSetQuadColor(&quad, 0xBE0A0A0A);
 	nglSetQuadZ(&quad, 0.5f);
 	nglListAddQuad(&quad);
@@ -563,12 +573,12 @@ void render_current_debug_menu() {
 	render_height += 12;
 	int render_x = menu_x_start;
 	render_x += 8;
-	nglListAddString(*nglSysFont, render_x, render_height, 0.2f, green_color, 1.f, 1.f, current_menu->title);
+	nglListAddString(*nglSysFont, (float)render_x, (float)(render_height), 0.2f, green_color, 1.f, 1.f, current_menu->title);
 	render_height += getStringHeight(current_menu->title);
 
 
 	if (current_menu->window_start) {
-		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, pink_color, 1.f, 1.f, UP_ARROW);
+		nglListAddString(*nglSysFont, (float)render_x, (float)render_height, 0.2f, pink_color, 1.f, 1.f, UP_ARROW);
 	}
 	render_height += getStringHeight(UP_ARROW);
 
@@ -580,12 +590,12 @@ void render_current_debug_menu() {
 
 		debug_menu_entry* entry = &current_menu->entries[current_menu->window_start + i];
 		char* cur = getRealText(entry, text_buffer);
-		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, current_color, 1.f, 1.f, cur);
+		nglListAddString(*nglSysFont, (float)render_x, (float)render_height, 0.2f, current_color, 1.f, 1.f, cur);
 		render_height += getStringHeight(cur);
 	}
 
 	if (needs_down_arrow) {
-		nglListAddString(*nglSysFont, render_x, render_height, 0.2f, pink_color, 1.f, 1.f, DOWN_ARROW);
+		nglListAddString(*nglSysFont, (float)render_x, (float)render_height, 0.2f, pink_color, 1.f, 1.f, DOWN_ARROW);
 		render_height += getStringHeight(DOWN_ARROW);
 	}
 
@@ -604,23 +614,8 @@ void myDebugMenu() {
 
 
 typedef int (*wndHandler_ptr)(HWND, UINT, WPARAM, LPARAM);
-wndHandler_ptr orig_WindowHandler = 0x005941A0;
+wndHandler_ptr orig_WindowHandler = (void*)0x005941A0;
 
-int WindowHandler(HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
-
-	switch (Msg) {
-	case WM_SYSKEYDOWN:
-	case WM_SYSKEYUP:
-	case WM_KEYUP:
-	case WM_KEYDOWN:
-	case WM_INPUT:
-		printf("swallowed keypress\n");
-		return;
-	}
-
-	return orig_WindowHandler(hwnd, Msg, wParam, lParam);
-
-}
 
 /*
 	STDMETHOD(GetDeviceState)(THIS_ DWORD,LPVOID) PURE;
@@ -635,23 +630,23 @@ GetDeviceState_ptr GetDeviceStateOriginal = NULL;
 
 
 typedef (__fastcall* game_pause_unpause_ptr)(void* this);
-game_pause_unpause_ptr game_pause = 0x0054FBE0;
-game_pause_unpause_ptr game_unpause = 0x0053A880;
+game_pause_unpause_ptr game_pause = (game_pause_unpause_ptr)0x0054FBE0;
+game_pause_unpause_ptr game_unpause = (game_pause_unpause_ptr)0x0053A880;
 
 
 
 
 typedef (__fastcall* game_get_cur_state_ptr)(void* this);
-game_get_cur_state_ptr game_get_cur_state = 0x005363D0;
+game_get_cur_state_ptr game_get_cur_state = (game_get_cur_state_ptr)0x005363D0;
 
 
 
 typedef (__fastcall* world_dynamics_system_remove_player_ptr)(void* this, void* edx, int number);
-world_dynamics_system_remove_player_ptr world_dynamics_system_remove_player = 0x00558550;
+world_dynamics_system_remove_player_ptr world_dynamics_system_remove_player = (void*)0x00558550;
 
 
 typedef (__fastcall* world_dynamics_system_add_player_ptr)(void* this, void* edx, mString* str);
-world_dynamics_system_add_player_ptr world_dynamics_system_add_player = 0x0055B400;
+world_dynamics_system_add_player_ptr world_dynamics_system_add_player = (void*)0x0055B400;
 
 
 DWORD changing_model = 0;
@@ -659,11 +654,11 @@ char* current_costume = "ultimate_spiderman";
 
 
 typedef (*entity_teleport_abs_po_ptr)(DWORD, float*, int one);
-entity_teleport_abs_po_ptr entity_teleport_abs_po = 0x004F3890;
+entity_teleport_abs_po_ptr entity_teleport_abs_po = (void*)0x004F3890;
 
 
 typedef DWORD* (__fastcall* ai_ai_core_get_info_node_ptr)(DWORD* this, void* edx, int a2, char a3);
-ai_ai_core_get_info_node_ptr ai_ai_core_get_info_node = 0x006A3390;
+ai_ai_core_get_info_node_ptr ai_ai_core_get_info_node = (void*)0x006A3390;
 
 
 
@@ -716,18 +711,18 @@ typedef struct {
 }string_hash;
 
 typedef void(__fastcall* string_hash_initialize_ptr)(string_hash* this, void* edx, int a2, char* Str1, int a4);
-string_hash_initialize_ptr string_hash_initialize = 0x00547A00;
+string_hash_initialize_ptr string_hash_initialize = (void*)0x00547A00;
 
 
 typedef int(__fastcall* script_object_find_func_ptr)(script_object* this, void* edx, string_hash* a2);
-script_object_find_func_ptr script_object_find_func = 0x0058EF80;
+script_object_find_func_ptr script_object_find_func = (void*)0x0058EF80;
 
 
 typedef DWORD  (__fastcall *script_executable_add_allocated_stuff_ptr)(script_executable* this, void *edx, int a2, int a3, int a4);
-script_executable_add_allocated_stuff_ptr script_executable_add_allocated_stuff = 0x005A34B0;
+script_executable_add_allocated_stuff_ptr script_executable_add_allocated_stuff = (void*)0x005A34B0;
 
 void vm_stack_push(slf* function, void* data, DWORD size) {
-	memcpy(function->stack_ptr, data, size);
+	memcpy((void*)function->stack_ptr, data, size);
 	function->stack_ptr += size;
 }
 
@@ -751,9 +746,9 @@ uint8_t __stdcall slf__debug_menu_entry__set_handler__str(slf* function, void* u
 
 
 	script_instance* instance = function->thread->instance;
-	int functionid = script_object_find_func(instance->object, NULL, *(DWORD*)&strhash);
+	int functionid = script_object_find_func(instance->object, NULL, *(void**)&strhash);
 	entry->data = instance;
-	entry->data1 = functionid;
+	entry->data1 = (void*)functionid;
 	
 	return 1;
 }
@@ -785,13 +780,13 @@ uint8_t __stdcall slf__create_progression_menu_entry(slf *function, void *unk) {
 
 
 	script_instance* instance = function->thread->instance;
-	int functionid = script_object_find_func(instance->object, NULL, *(DWORD*)&strhash);
+	int functionid = script_object_find_func(instance->object, NULL, *(void**)&strhash);
 
 	debug_menu_entry entry;
 	memset(&entry, 0, sizeof(entry));
 	entry.entry_type = NORMAL;
 	entry.data = instance;
-	entry.data1 = functionid;
+	entry.data1 = (void*)functionid;
 
 	strcpy(entry.text, strs[0]);
 
@@ -828,11 +823,11 @@ uint8_t __stdcall slf__create_debug_menu_entry(slf* function, void* unk) {
 	void *res = add_debug_menu_entry(script_menu, &entry);
 
 	script_executable* se = function->thread->vmexecutable->unk_struct->scriptexecutable;
-	script_executable_add_allocated_stuff(se, NULL, vm_debug_menu_entry_garbage_collection_id, res, 0);
+	script_executable_add_allocated_stuff(se, NULL, vm_debug_menu_entry_garbage_collection_id, (int)res, 0);
 
 	//printf("%08X\n", res);
 
-	int push = res;
+	int push = (int)res;
 	vm_stack_push(function, &push, sizeof(push));
 	return 1;
 }
@@ -895,16 +890,24 @@ void menu_go_up() {
 
 }
 
-int sort_warp_entries(debug_menu_entry* entry1, debug_menu_entry* entry2) {
+int sort_warp_entries(const debug_menu_entry* entry1, const debug_menu_entry* entry2) {
 	return strcmp(entry1->text, entry2->text);
 }
 
 
-char* district_variant_string_generator(debug_menu_entry* entry) {
+void district_variant_string_generator(debug_menu_entry* entry) {
 
-	char buffer[128];
-	sprintf(buffer, "%s: %d", entry->text, region_get_district_variant(entry->data));
-	return buffer;
+	int old_variant = (int)entry->data1;
+	int current_variant = region_get_district_variant(entry->data);
+
+	char* region_name = region_get_name(entry->data);
+	if (current_variant == old_variant) {
+		return;
+	}
+
+
+	snprintf(entry->text, MAX_CHARS,"%s: %d", region_name, current_variant);
+	entry->data1 = (void*)current_variant;
 }
 
 
@@ -1043,10 +1046,10 @@ void menu_setup(int game_state, int keyboard) {
 		if (warp_menu->used_slots == 0) {
 
 			debug_menu_entry poi = { "--- WARP TO POI ---", NORMAL, NULL };
-			poi.data1 = 1;
+			poi.data1 = (void*)1;
 			add_debug_menu_entry(warp_menu, &poi);
 
-			for (int i = 0; i < *number_of_allocated_regions; i++) {
+			for (DWORD i = 0; i < *number_of_allocated_regions; i++) {
 				region* cur_region = &(*all_regions)[i];
 				char* region_name = region_get_name(cur_region);
 
@@ -1056,9 +1059,14 @@ void menu_setup(int game_state, int keyboard) {
 				add_debug_menu_entry(warp_menu, &warp_entry);
 
 				if (cur_region->variants >= 2) {
-					warp_entry.entry_type = CUSTOM;
-					warp_entry.custom_string_generator = district_variant_string_generator;
-					add_debug_menu_entry(district_variants_menu, &warp_entry);
+					debug_menu_entry variant_entry;
+					memcpy(&variant_entry, &warp_entry, sizeof(debug_menu_entry));
+
+					variant_entry.data1 = (void*)0xFFFFFFFF;
+
+					variant_entry.entry_type = CUSTOM;
+					variant_entry.custom_string_generator = district_variant_string_generator;
+					add_debug_menu_entry(district_variants_menu, &variant_entry);
 				}
 			}
 			qsort(warp_menu->entries, *number_of_allocated_regions, sizeof(debug_menu_entry), sort_warp_entries);
@@ -1068,7 +1076,7 @@ void menu_setup(int game_state, int keyboard) {
 
 
 		if (options_menu->used_slots == 2) {
-			BYTE* arr = *(DWORD*)0x96858C;
+			BYTE* arr = *(BYTE**)0x96858C;
 			debug_menu_entry render_fe = { "Render FE UI ", BOOLEAN_E,  &arr[4 + 0x90] };
 			add_debug_menu_entry(options_menu, &render_fe);
 
@@ -1078,7 +1086,7 @@ void menu_setup(int game_state, int keyboard) {
 			add_debug_menu_entry(options_menu, &live_in_glass_house);
 
 
-			BYTE* god_mode = 0x95A6A8;
+			BYTE* god_mode = (void*)0x95A6A8;
 			debug_menu_entry god_mode_entry = { "God Mode ", BOOLEAN_E,  &god_mode[0] };
 			debug_menu_entry mega_god_mode = { "Mega God Mode ", BOOLEAN_E,  &god_mode[1] };
 			debug_menu_entry ultra_god_mode = { "Ultra God Mode ", BOOLEAN_E,  &god_mode[2] };
@@ -1186,7 +1194,7 @@ HRESULT __stdcall GetDeviceDataHook(IDirectInputDevice8* this, DWORD cbObjectDat
 	if (res == DI_OK) {
 
 		printf("All gud\n");
-		for (int i = 0; i < *pdwInOut; i++) {
+		for (DWORD i = 0; i < *pdwInOut; i++) {
 
 
 			if (LOBYTE(rgdod[i].dwData) > 0) {
@@ -1228,15 +1236,15 @@ HRESULT  __stdcall IDirectInput8CreateDeviceHook(IDirectInput8W* this, const GUI
 	else
 		puts("Hooking something different...maybe a controller");
 
-	DWORD* vtbl = (*device)->lpVtbl;
+	DWORD* vtbl = (DWORD*)(*device)->lpVtbl;
 	if (!GetDeviceStateOriginal) {
-		GetDeviceStateOriginal = vtbl[9];
-		vtbl[9] = GetDeviceStateHook;
+		GetDeviceStateOriginal = (void*)vtbl[9];
+		vtbl[9] = (DWORD)GetDeviceStateHook;
 	}
 
 	if (!GetDeviceDataOriginal) {
-		GetDeviceDataOriginal = vtbl[10];
-		vtbl[10] = GetDeviceDataHook;
+		GetDeviceDataOriginal = (void*)vtbl[10];
+		vtbl[10] = (DWORD)GetDeviceDataHook;
 	}
 
 	return res;
@@ -1253,14 +1261,6 @@ HRESULT  __stdcall IDirectInput8ReleaseHook(IDirectInput8W* this) {
 }
 
 
-BOOL CALLBACK EnumDevices(LPCDIDEVICEINSTANCE lpddi, LPVOID buffer) {
-
-	wchar_t wGUID[40] = { 0 };
-	char cGUID[40] = { 0 };
-
-	//printf("%d\n", lpddi->guidProduct);
-}
-
 typedef HRESULT(__stdcall* DirectInput8Create_ptr)(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID* ppvOut, LPUNKNOWN punkOuter);
 HRESULT __stdcall HookDirectInput8Create(HINSTANCE hinst, DWORD dwVersion, REFIID riidltf, LPVOID* ppvOut, LPUNKNOWN punkOuter)
 {
@@ -1268,34 +1268,26 @@ HRESULT __stdcall HookDirectInput8Create(HINSTANCE hinst, DWORD dwVersion, REFII
 	HRESULT res = caller(hinst, dwVersion, riidltf, ppvOut, punkOuter);
 
 
-	IDirectInput8** iDir = ppvOut;
-	printf("it's me mario %08X %08X\n", ppvOut, (*iDir)->lpVtbl);
+	IDirectInput8** iDir = (void*)ppvOut;
+	printf("it's me mario %08X %08X\n", (DWORD)ppvOut, (DWORD)(*iDir)->lpVtbl);
 
 
 	DWORD* vtbl = (DWORD*)(*iDir)->lpVtbl;
 	if (!createDeviceOriginal) {
-		createDeviceOriginal = vtbl[3];
-		vtbl[3] = IDirectInput8CreateDeviceHook;
+		createDeviceOriginal = (void*)vtbl[3];
+		vtbl[3] = (DWORD)IDirectInput8CreateDeviceHook;
 	}
 
 
-	//(*iDir)->lpVtbl->EnumDevices(*iDir, DI8DEVCLASS_ALL, EnumDevices, NULL, DIEDFL_ALLDEVICES);
 	return res;
 }
 
 
-DWORD hookDirectInputAddress = HookDirectInput8Create;
+DWORD hookDirectInputAddress = (DWORD)HookDirectInput8Create;
 
-
-void update_state() {
-
-	while (1) {
-		OutputDebugStringA("PILA %d", 6);
-	}
-}
 
 typedef int(__fastcall* game_handle_game_states_ptr)(void* this, void* edx, void* a2);
-game_handle_game_states_ptr game_handle_game_states_original = 0x0055D510;
+game_handle_game_states_ptr game_handle_game_states_original = (void*)0x0055D510;
 
 int __fastcall game_handle_game_states(void* this, void* edx, void* a2) {
 
@@ -1311,7 +1303,7 @@ int __fastcall game_handle_game_states(void* this, void* edx, void* a2) {
 		if (!changing_model) {
 			mString str;
 			mString_constructor(&str, NULL, current_costume);
-			world_dynamics_system_add_player(*(DWORD*)g_world_ptr, NULL, &str);
+			world_dynamics_system_add_player(*(DWORD**)g_world_ptr, NULL, &str);
 			mString_finalize(&str, NULL, 0);
 			game_unpause(g_game_ptr);
 		}
@@ -1328,11 +1320,11 @@ int __fastcall game_handle_game_states(void* this, void* edx, void* a2) {
 	return game_handle_game_states_original(this, edx, a2);
 }
 
-typedef void(__fastcall* sub_41F9D0_ptr)(char* this, void* edx, const char* a2, signed int a3);
-sub_41F9D0_ptr sub_41F9D0 = 0x41F9D0;
+typedef void* (__fastcall* sub_41F9D0_ptr)(char* this, void* edx, const char* a2, signed int a3);
+sub_41F9D0_ptr sub_41F9D0 = (void*)0x41F9D0;
 
 
-void __fastcall sub_41F9D0_hook(char* this, void* edx, const char* a2, signed int a3) {
+void* __fastcall sub_41F9D0_hook(char* this, void* edx, const char* a2, signed int a3) {
 
 	//printf("mString:%s\n", a2);
 
@@ -1341,7 +1333,7 @@ void __fastcall sub_41F9D0_hook(char* this, void* edx, const char* a2, signed in
 }
 
 typedef DWORD(__fastcall* ai_hero_base_state_check_transition_ptr)(DWORD* this, void* edx, DWORD* a2, int a3);
-ai_hero_base_state_check_transition_ptr ai_hero_base_state_check_transition = 0x00478D80;
+ai_hero_base_state_check_transition_ptr ai_hero_base_state_check_transition = (void*)0x00478D80;
 
 DWORD __fastcall ai_hero_base_state_check_transition_hook(DWORD* this, void* edx, DWORD* a2, int a3) {
 	ai_current_player = this;
@@ -1350,7 +1342,7 @@ DWORD __fastcall ai_hero_base_state_check_transition_hook(DWORD* this, void* edx
 
 
 typedef DWORD* (__fastcall* get_info_node_ptr)(void* this, void* edx, int a2, char a3);
-get_info_node_ptr get_info_node = 0x006A3390;
+get_info_node_ptr get_info_node = (void*)0x006A3390;
 
 DWORD* __fastcall get_info_node_hook(void* this, void* edx, int a2, char a3) {
 
@@ -1362,19 +1354,13 @@ DWORD* __fastcall get_info_node_hook(void* this, void* edx, int a2, char a3) {
 
 
 typedef int (_fastcall* resource_pack_streamer_load_internal_ptr)(void* this, void* edx, char* str, int a3, int a4, int a5);
-resource_pack_streamer_load_internal_ptr resource_pack_streamer_load_internal = 0x0054C580;
-
-void __fastcall resource_pack_streamer_load_internal_hook(void* this, void* edx, char* str, int a3, int a4, int a5) {
-
-
-	return resource_pack_streamer_load_internal(this, edx, str, a3, a4, a5);
-}
+resource_pack_streamer_load_internal_ptr resource_pack_streamer_load_internal = (void*)0x0054C580;
 
 
 
 uint8_t __fastcall os_developer_options(BYTE *this, void *edx, int flag) {
 
-	char** flag_list = 0x936420;
+	char** flag_list = (void*)0x936420;
 	char* flag_text = flag_list[flag];
 		
 	uint8_t res = this[flag + 4];
@@ -1392,9 +1378,9 @@ uint8_t __fastcall os_developer_options(BYTE *this, void *edx, int flag) {
 
 void install_patches() {
 
-	HookFunc(0x004EACF0, (DWORD)aeps_RenderAll, 0, "Patching call to aeps::RenderAll");
+	HookFunc(0x004EACF0, aeps_RenderAll, 0, "Patching call to aeps::RenderAll");
 
-	HookFunc(0x0052B5D7, (DWORD)myDebugMenu, 0, "Hooking nglListEndScene to inject debug menu");
+	HookFunc(0x0052B5D7, myDebugMenu, 0, "Hooking nglListEndScene to inject debug menu");
 	//save orig ptr
 	nflSystemOpenFile_orig = *nflSystemOpenFile_data;
 	*nflSystemOpenFile_data = &nflSystemOpenFile;
@@ -1406,13 +1392,13 @@ void install_patches() {
 	printf("Replaced ReadOrWrite %08X -> %08X\n", (DWORD)ReadOrWrite_orig, (DWORD)&ReadOrWrite);
 
 
-	*(DWORD*)0x008218B2 = &hookDirectInputAddress;
+	*(DWORD**)0x008218B2 = &hookDirectInputAddress;
 	printf("Patching the DirectInput8Create call\n");
 
 
-	HookFunc(0x0055D742, (DWORD)game_handle_game_states, 0, "Hooking handle_game_states");
+	HookFunc(0x0055D742, game_handle_game_states, 0, "Hooking handle_game_states");
 
-	HookFunc(0x00421128, (DWORD)sub_41F9D0_hook, 0, "Hooking sub_41F9D0");
+	HookFunc(0x00421128, sub_41F9D0_hook, 0, "Hooking sub_41F9D0");
 
 
 	/*
@@ -1463,7 +1449,7 @@ void handle_debug_entry(debug_menu_entry* entry) {
 }
 
 typedef char (__fastcall *entity_tracker_manager_get_the_arrow_target_pos_ptr)(DWORD* this, void* edx, DWORD* a2);
-entity_tracker_manager_get_the_arrow_target_pos_ptr entity_tracker_manager_get_the_arrow_target_pos = 0x0062EE10;
+entity_tracker_manager_get_the_arrow_target_pos_ptr entity_tracker_manager_get_the_arrow_target_pos = (void*)0x0062EE10;
 
 void handle_warp_entry(debug_menu_entry* entry) {
 	
@@ -1491,7 +1477,7 @@ void handle_warp_entry(debug_menu_entry* entry) {
 		unlock_region(cur_region);
 	}
 	else {
-		int res = entity_tracker_manager_get_the_arrow_target_pos( *(*(DWORD***)0x937B18 + 21), NULL, final_pos);
+		int res = entity_tracker_manager_get_the_arrow_target_pos( *(*(DWORD***)0x937B18 + 21), NULL, (void*)final_pos);
 		if (!res)
 			return;
 	}
@@ -1510,7 +1496,7 @@ void handle_char_select_entry(debug_menu_entry* entry) {
 
 	while (*some_number) {
 		//printf("some_number %d\n", *some_number);
-		world_dynamics_system_remove_player(*(DWORD*)g_world_ptr, NULL, *some_number - 1);
+		world_dynamics_system_remove_player(*(DWORD**)g_world_ptr, NULL, *some_number - 1);
 	}
 
 	debug_enabled = 0;
@@ -1527,14 +1513,14 @@ void handle_options_select_entry(debug_menu_entry* entry) {
 }
 
 typedef void* (__fastcall* script_instance_add_thread_ptr)(script_instance* this, void* edx, vm_executable* a1, void* a2);
-script_instance_add_thread_ptr script_instance_add_thread = 0x005AAD00;
+script_instance_add_thread_ptr script_instance_add_thread = (void*)0x005AAD00;
 
 void handle_progression_select_entry(debug_menu_entry* entry) {
 
 	script_instance* instance = entry->data;
-	int functionid = entry->data1;
+	int functionid = (int)entry->data1;
 
-	DWORD addr = entry;
+	DWORD addr = (DWORD)entry;
 
 	script_instance_add_thread(instance, NULL, instance->object->vmexecutable[functionid], &addr);
 
@@ -1571,13 +1557,13 @@ void handle_distriction_variants_select_entry(debug_menu_entry* entry, custom_ke
 
 void setup_debug_menu() {
 
-	start_debug = create_menu("Debug Menu", close_debug, handle_debug_entry, 2);
-	warp_menu = create_menu("Warp", goto_start_debug, handle_warp_entry, 300);
-	char_select_menu = create_menu("Char Select", goto_start_debug, handle_char_select_entry, 5);
-	options_menu = create_menu("Options", goto_start_debug, handle_options_select_entry, 2);
-	script_menu = create_menu("Script", goto_start_debug, handle_script_select_entry, 50);
-	progression_menu = create_menu("Progression", goto_start_debug, handle_progression_select_entry, 10);
-	district_variants_menu = create_menu("District variants", goto_start_debug, handle_distriction_variants_select_entry, 15);
+	start_debug = create_menu("Debug Menu", close_debug, (menu_handler_function)handle_debug_entry, 2);
+	warp_menu = create_menu("Warp", goto_start_debug, (menu_handler_function)handle_warp_entry, 300);
+	char_select_menu = create_menu("Char Select", goto_start_debug, (menu_handler_function)handle_char_select_entry, 5);
+	options_menu = create_menu("Options", goto_start_debug, (menu_handler_function)handle_options_select_entry, 2);
+	script_menu = create_menu("Script", goto_start_debug, (menu_handler_function)handle_script_select_entry, 50);
+	progression_menu = create_menu("Progression", goto_start_debug, (menu_handler_function)handle_progression_select_entry, 10);
+	district_variants_menu = create_menu("District variants", goto_start_debug, (menu_handler_function)handle_distriction_variants_select_entry, 15);
 
 
 	debug_menu_entry warp_entry = { "Warp", NORMAL, warp_menu };
@@ -1617,8 +1603,8 @@ void setup_debug_menu() {
 	}
 
 
-	debug_menu_entry show_fps = { "Show FPS", BOOLEAN_E, 0x975848 };
-	debug_menu_entry memory_info = { "Memory Info", BOOLEAN_E, 0x975849 };
+	debug_menu_entry show_fps = { "Show FPS", BOOLEAN_E, (void*)0x975848 };
+	debug_menu_entry memory_info = { "Memory Info", BOOLEAN_E, (void*)0x975849 };
 	
 
 	add_debug_menu_entry(options_menu, &show_fps);
