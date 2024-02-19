@@ -2,6 +2,8 @@
 #include <windows.h>
 #include <stdio.h>
 #include "forwards.h"
+#include "slf.h"
+#include "slf_functions.h"
 
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
@@ -84,6 +86,9 @@ typedef struct _list{
 }list;
 
 typedef struct {
+	DWORD unk0;
+	DWORD strlen;
+	char* actualString;
 	BYTE unk[256];//not sure how big
 }mString;
 
@@ -125,6 +130,8 @@ typedef enum {
 struct _debug_menu_entry;
 typedef void (*custom_string_generator_ptr)(struct _debug_menu_entry* entry);
 
+typedef void (*menu_handler_function)(struct _debug_menu_entry*, custom_key_type key_type);
+typedef void (*custom_entry_handler_ptr)(struct _debug_menu_entry* entry, custom_key_type key_type, menu_handler_function menu_handler);
 typedef struct _debug_menu_entry {
 
 	char text[MAX_CHARS];
@@ -132,9 +139,9 @@ typedef struct _debug_menu_entry {
 	void* data;
 	void* data1;
 	custom_string_generator_ptr custom_string_generator;
+	custom_entry_handler_ptr custom_handler;
 }debug_menu_entry;
 
-typedef void (*menu_handler_function)(debug_menu_entry*, custom_key_type key_type);
 typedef void (*go_back_function)();
 
 typedef struct {
@@ -312,6 +319,10 @@ region_get_district_variant_ptr region_get_district_variant = (region_get_distri
 
 typedef char(__fastcall* terrain_set_district_variant_ptr)(void* this, void* edx, DWORD district_id, int variant, char one);
 terrain_set_district_variant_ptr terrain_set_district_variant = (terrain_set_district_variant_ptr)0x00557480;
+
+
+typedef void (*us_lighting_switch_time_of_day_ptr)(int time_of_day);
+us_lighting_switch_time_of_day_ptr us_lighting_switch_time_of_day = (void*)0x00408790;
 
 void set_text_writeable() {
 
@@ -662,49 +673,6 @@ ai_ai_core_get_info_node_ptr ai_ai_core_get_info_node = (void*)0x006A3390;
 
 
 
-struct vm_executable;
-
-
-
-typedef struct {
-	uint8_t unk[0x20];
-	struct vm_executable** vmexecutable;
-}script_object;
-
-typedef struct {
-	uint8_t unk[0x2C];
-	script_object* object;
-}script_instance;
-
-
-typedef struct {
-	DWORD unk;
-}script_executable;
-
-typedef struct unknown_struct {
-	DWORD unk;
-	script_executable* scriptexecutable;
-}unknown_struct;
-
-typedef struct vm_executable{
-	unknown_struct* unk_struct;
-	DWORD unk[2];
-	DWORD params;
-}vm_executable;
-
-typedef struct {
-	uint8_t unk[0xC];
-	script_instance* instance;
-	vm_executable* vmexecutable;
-}vm_thread;
-
-typedef struct {
-	uint8_t unk[0x184];
-	DWORD stack_ptr;
-	vm_thread* thread;
-}slf;
-
-
 
 typedef struct {
 	DWORD unk[32];
@@ -721,15 +689,6 @@ script_object_find_func_ptr script_object_find_func = (void*)0x0058EF80;
 typedef DWORD  (__fastcall *script_executable_add_allocated_stuff_ptr)(script_executable* this, void *edx, int a2, int a3, int a4);
 script_executable_add_allocated_stuff_ptr script_executable_add_allocated_stuff = (void*)0x005A34B0;
 
-void vm_stack_push(slf* function, void* data, DWORD size) {
-	memcpy((void*)function->stack_ptr, data, size);
-	function->stack_ptr += size;
-}
-
-void vm_stack_pop(slf* function, DWORD size) {
-	function->stack_ptr -= size;
-}
-
 
 uint8_t __stdcall slf__debug_menu_entry__set_handler__str(slf* function, void* unk) {
 
@@ -739,7 +698,6 @@ uint8_t __stdcall slf__debug_menu_entry__set_handler__str(slf* function, void* u
 
 	debug_menu_entry* entry = params[0];
 	char* scrpttext = params[1];
-
 
 	string_hash strhash;
 	string_hash_initialize(&strhash, NULL, 0, scrpttext, 0);
@@ -1026,6 +984,31 @@ void GetDeviceStateHandleControllerInput(LPVOID lpvData) {
 
 }
 
+DWORD* g_TOD = (void*)0x0091E000;
+void time_of_day_name_generator(debug_menu_entry *entry) {
+
+	DWORD lastTOD = (DWORD)entry->data;
+	DWORD currentTOD = *g_TOD;
+	if (currentTOD == lastTOD) {
+		return;
+	}
+
+	snprintf(entry->text, MAX_CHARS, "Time of Day: %d", currentTOD);
+	lastTOD = currentTOD;
+}
+
+void time_of_day_handler(debug_menu_entry *entry, custom_key_type key, menu_handler_function original) {
+
+	DWORD currentTOD = *g_TOD;
+	switch (key) {
+		case LEFT:
+			us_lighting_switch_time_of_day(modulo(currentTOD - 1, 4));
+			break;
+		case RIGHT:
+			us_lighting_switch_time_of_day(modulo(currentTOD + 1, 4));
+			break;
+	}
+}
 
 void menu_setup(int game_state, int keyboard) {
 
@@ -1066,6 +1049,7 @@ void menu_setup(int game_state, int keyboard) {
 
 					variant_entry.entry_type = CUSTOM;
 					variant_entry.custom_string_generator = district_variant_string_generator;
+					variant_entry.custom_handler = NULL;
 					add_debug_menu_entry(district_variants_menu, &variant_entry);
 				}
 			}
@@ -1095,8 +1079,14 @@ void menu_setup(int game_state, int keyboard) {
 			add_debug_menu_entry(options_menu, &mega_god_mode);
 			add_debug_menu_entry(options_menu, &ultra_god_mode);
 
-
-
+			debug_menu_entry time_of_day = {
+				.text = "Time of Day",
+				.entry_type = CUSTOM,
+				.custom_string_generator = time_of_day_name_generator,
+				.custom_handler = time_of_day_handler,
+				.data = (void*)0xFFFFFFFF
+			};
+			add_debug_menu_entry(options_menu, &time_of_day);
 		}
 	}
 }
@@ -1132,8 +1122,20 @@ void menu_input_handler(int keyboard, int SCROLL_SPEED) {
 	else if (is_menu_key_pressed(MENU_LEFT, keyboard) || is_menu_key_pressed(MENU_RIGHT, keyboard)) {
 
 		debug_menu_entry* cur = &current_menu->entries[current_menu->window_start + current_menu->cur_index];
-		if (cur->entry_type == BOOLEAN_E || cur->entry_type == CUSTOM)
-			current_menu->handler(cur, (is_menu_key_pressed(MENU_LEFT, keyboard) ? LEFT : RIGHT));
+		custom_key_type pressed = (is_menu_key_pressed(MENU_LEFT, keyboard) ? LEFT : RIGHT);
+
+		switch (cur->entry_type) {
+			case BOOLEAN_E:
+				current_menu->handler(cur, pressed);
+				break;
+			case CUSTOM:
+				if (cur->custom_handler != NULL) {
+					cur->custom_handler(cur, pressed, current_menu->handler);
+				}
+				else {
+					current_menu->handler(cur, pressed);
+				}
+		}
 	}
 }
 
@@ -1376,6 +1378,478 @@ uint8_t __fastcall os_developer_options(BYTE *this, void *edx, int flag) {
 	return res;
 }
 
+void dump_vtable(const char* name, DWORD* vtable) {
+	printf("%s|%08X|%08X\n", name, vtable[0], vtable[1]);
+}
+
+void hook_slf_vtable(void* decons, void* action, DWORD* vtable) {
+	vtable[0] = (DWORD)decons;
+	vtable[1] = (DWORD)action;
+}
+
+void hook_slf_vtables() {
+
+	hook_slf_vtable(slf_deconstructor_abs_delay_num, slf_action_abs_delay_num, (void*)0x89a724);
+	hook_slf_vtable(slf_deconstructor_acos_num, slf_action_acos_num, (void*)0x89a91c);
+	hook_slf_vtable(slf_deconstructor_add_2d_debug_str_vector3d_vector3d_num_str, slf_action_add_2d_debug_str_vector3d_vector3d_num_str, (void*)0x89a860);
+	hook_slf_vtable(slf_deconstructor_add_2d_debug_str_vector3d_vector3d_num_str_num, slf_action_add_2d_debug_str_vector3d_vector3d_num_str_num, (void*)0x89a858);
+	hook_slf_vtable(slf_deconstructor_add_3d_debug_str_vector3d_vector3d_num_str, slf_action_add_3d_debug_str_vector3d_vector3d_num_str, (void*)0x89a850);
+	hook_slf_vtable(slf_deconstructor_add_civilian_info_vector3d_num_num_num, slf_action_add_civilian_info_vector3d_num_num_num, (void*)0x89c5bc);
+	hook_slf_vtable(slf_deconstructor_add_civilian_info_entity_entity_num_num_num, slf_action_add_civilian_info_entity_entity_num_num_num, (void*)0x89c5cc);
+	hook_slf_vtable(slf_deconstructor_add_debug_cyl_vector3d_vector3d_num, slf_action_add_debug_cyl_vector3d_vector3d_num, (void*)0x89a774);
+	hook_slf_vtable(slf_deconstructor_add_debug_cyl_vector3d_vector3d_num_vector3d_num, slf_action_add_debug_cyl_vector3d_vector3d_num_vector3d_num, (void*)0x89a77c);
+	hook_slf_vtable(slf_deconstructor_add_debug_line_vector3d_vector3d, slf_action_add_debug_line_vector3d_vector3d, (void*)0x89a764);
+	hook_slf_vtable(slf_deconstructor_add_debug_line_vector3d_vector3d_vector3d_num, slf_action_add_debug_line_vector3d_vector3d_vector3d_num, (void*)0x89a76c);
+	hook_slf_vtable(slf_deconstructor_add_debug_sphere_vector3d_num, slf_action_add_debug_sphere_vector3d_num, (void*)0x89a754);
+	hook_slf_vtable(slf_deconstructor_add_debug_sphere_vector3d_num_vector3d_num, slf_action_add_debug_sphere_vector3d_num_vector3d_num, (void*)0x89a75c);
+	hook_slf_vtable(slf_deconstructor_add_glass_house_str, slf_action_add_glass_house_str, (void*)0x89a548);
+	hook_slf_vtable(slf_deconstructor_add_glass_house_str_num, slf_action_add_glass_house_str_num, (void*)0x89a550);
+	hook_slf_vtable(slf_deconstructor_add_glass_house_str_num_vector3d, slf_action_add_glass_house_str_num_vector3d, (void*)0x89a560);
+	hook_slf_vtable(slf_deconstructor_add_glass_house_str_vector3d, slf_action_add_glass_house_str_vector3d, (void*)0x89a558);
+	hook_slf_vtable(slf_deconstructor_add_to_console_str, slf_action_add_to_console_str, (void*)0x89a834);
+	hook_slf_vtable(slf_deconstructor_add_traffic_model_num_str, slf_action_add_traffic_model_num_str, (void*)0x89c5a4);
+	hook_slf_vtable(slf_deconstructor_allow_suspend_thread_num, slf_action_allow_suspend_thread_num, (void*)0x89a594);
+	hook_slf_vtable(slf_deconstructor_angle_between_vector3d_vector3d, slf_action_angle_between_vector3d_vector3d, (void*)0x89ba50);
+	hook_slf_vtable(slf_deconstructor_apply_donut_damage_vector3d_num_num_num_num_num, slf_action_apply_donut_damage_vector3d_num_num_num_num_num, (void*)0x89a804);
+	hook_slf_vtable(slf_deconstructor_apply_radius_damage_vector3d_num_num_num_num, slf_action_apply_radius_damage_vector3d_num_num_num_num, (void*)0x89a7fc);
+	hook_slf_vtable(slf_deconstructor_apply_radius_subdue_vector3d_num_num_num_num, slf_action_apply_radius_subdue_vector3d_num_num_num_num, (void*)0x89a80c);
+	hook_slf_vtable(slf_deconstructor_assert_num_str, slf_action_assert_num_str, (void*)0x89a518);
+	hook_slf_vtable(slf_deconstructor_attach_decal_str_vector3d_num_vector3d_entity, slf_action_attach_decal_str_vector3d_num_vector3d_entity, (void*)0x89a9fc);
+	hook_slf_vtable(slf_deconstructor_begin_screen_recording_str_num, slf_action_begin_screen_recording_str_num, (void*)0x89b7b0);
+	hook_slf_vtable(slf_deconstructor_blackscreen_off_num, slf_action_blackscreen_off_num, (void*)0x89bcac);
+	hook_slf_vtable(slf_deconstructor_blackscreen_on_num, slf_action_blackscreen_on_num, (void*)0x89bca0);
+	hook_slf_vtable(slf_deconstructor_bring_up_dialog_box_num_num_elip, slf_action_bring_up_dialog_box_num_num_elip, (void*)0x89bc28);
+	hook_slf_vtable(slf_deconstructor_bring_up_dialog_box_debug_str_num_str, slf_action_bring_up_dialog_box_debug_str_num_str, (void*)0x89bc38);
+	hook_slf_vtable(slf_deconstructor_bring_up_dialog_box_title_num_num_num_elip, slf_action_bring_up_dialog_box_title_num_num_num_elip, (void*)0x89bc30);
+	hook_slf_vtable(slf_deconstructor_bring_up_medal_award_box_num, slf_action_bring_up_medal_award_box_num, (void*)0x89bb10);
+	hook_slf_vtable(slf_deconstructor_bring_up_race_announcer, slf_action_bring_up_race_announcer, (void*)0x89bb08);
+	hook_slf_vtable(slf_deconstructor_calc_launch_vector_vector3d_vector3d_num_entity, slf_action_calc_launch_vector_vector3d_vector3d_num_entity, (void*)0x89a98c);
+	hook_slf_vtable(slf_deconstructor_can_load_pack_str, slf_action_can_load_pack_str, (void*)0x89c3f4);
+	hook_slf_vtable(slf_deconstructor_chase_cam, slf_action_chase_cam, (void*)0x89af04);
+	hook_slf_vtable(slf_deconstructor_clear_all_grenades, slf_action_clear_all_grenades, (void*)0x89a95c);
+	hook_slf_vtable(slf_deconstructor_clear_civilians_within_radius_vector3d_num, slf_action_clear_civilians_within_radius_vector3d_num, (void*)0x89c5e4);
+	hook_slf_vtable(slf_deconstructor_clear_controls, slf_action_clear_controls, (void*)0x89bd48);
+	hook_slf_vtable(slf_deconstructor_clear_debug_all, slf_action_clear_debug_all, (void*)0x89a79c);
+	hook_slf_vtable(slf_deconstructor_clear_debug_cyls, slf_action_clear_debug_cyls, (void*)0x89a794);
+	hook_slf_vtable(slf_deconstructor_clear_debug_lines, slf_action_clear_debug_lines, (void*)0x89a78c);
+	hook_slf_vtable(slf_deconstructor_clear_debug_spheres, slf_action_clear_debug_spheres, (void*)0x89a784);
+	hook_slf_vtable(slf_deconstructor_clear_screen, slf_action_clear_screen, (void*)0x89a944);
+	hook_slf_vtable(slf_deconstructor_clear_traffic_within_radius_vector3d_num, slf_action_clear_traffic_within_radius_vector3d_num, (void*)0x89c5dc);
+	hook_slf_vtable(slf_deconstructor_col_check_vector3d_vector3d_num, slf_action_col_check_vector3d_vector3d_num, (void*)0x89a868);
+	hook_slf_vtable(slf_deconstructor_console_exec_str, slf_action_console_exec_str, (void*)0x89a83c);
+	hook_slf_vtable(slf_deconstructor_copy_vector3d_list_vector3d_list_vector3d_list, slf_action_copy_vector3d_list_vector3d_list_vector3d_list, (void*)0x89bed4);
+	hook_slf_vtable(slf_deconstructor_cos_num, slf_action_cos_num, (void*)0x89a90c);
+	hook_slf_vtable(slf_deconstructor_create_beam, slf_action_create_beam, (void*)0x89abb4);
+	hook_slf_vtable(slf_deconstructor_create_credits, slf_action_create_credits, (void*)0x89bae8);
+	hook_slf_vtable(slf_deconstructor_create_cut_scene_str, slf_action_create_cut_scene_str, (void*)0x89b7c0);
+	//hook_slf_vtable(slf_deconstructor_create_debug_menu_entry_str, slf_action_create_debug_menu_entry_str, (void*)0x89c704);
+	//hook_slf_vtable(slf_deconstructor_create_debug_menu_entry_str_str, slf_action_create_debug_menu_entry_str_str, (void*)0x89c70c);
+	hook_slf_vtable(slf_deconstructor_create_decal_str_vector3d_num_vector3d, slf_action_create_decal_str_vector3d_num_vector3d, (void*)0x89a9f4);
+	hook_slf_vtable(slf_deconstructor_create_entity_str, slf_action_create_entity_str, (void*)0x89af0c);
+	hook_slf_vtable(slf_deconstructor_create_entity_str_str, slf_action_create_entity_str_str, (void*)0x89af14);
+	hook_slf_vtable(slf_deconstructor_create_entity_in_hero_region_str, slf_action_create_entity_in_hero_region_str, (void*)0x89af2c);
+	hook_slf_vtable(slf_deconstructor_create_entity_list, slf_action_create_entity_list, (void*)0x89bfcc);
+	hook_slf_vtable(slf_deconstructor_create_entity_tracker_entity, slf_action_create_entity_tracker_entity, (void*)0x89c594);
+	hook_slf_vtable(slf_deconstructor_create_item_str, slf_action_create_item_str, (void*)0x89b6b4);
+	hook_slf_vtable(slf_deconstructor_create_line_info_vector3d_vector3d, slf_action_create_line_info_vector3d_vector3d, (void*)0x89b708);
+	hook_slf_vtable(slf_deconstructor_create_lofi_stereo_sound_inst_str, slf_action_create_lofi_stereo_sound_inst_str, (void*)0x89b818);
+	hook_slf_vtable(slf_deconstructor_create_num_list, slf_action_create_num_list, (void*)0x89bf54);
+	hook_slf_vtable(slf_deconstructor_create_pfx_str, slf_action_create_pfx_str, (void*)0x89c904);
+	hook_slf_vtable(slf_deconstructor_create_pfx_str_vector3d, slf_action_create_pfx_str_vector3d, (void*)0x89c90c);
+	hook_slf_vtable(slf_deconstructor_create_polytube, slf_action_create_polytube, (void*)0x89c228);
+	hook_slf_vtable(slf_deconstructor_create_polytube_str, slf_action_create_polytube_str, (void*)0x89c230);
+	//hook_slf_vtable(slf_deconstructor_create_progression_menu_entry_str_str, slf_action_create_progression_menu_entry_str_str, (void*)0x89c714);
+	hook_slf_vtable(slf_deconstructor_create_sound_inst, slf_action_create_sound_inst, (void*)0x89b7f8);
+	hook_slf_vtable(slf_deconstructor_create_sound_inst_str, slf_action_create_sound_inst_str, (void*)0x89b800);
+	hook_slf_vtable(slf_deconstructor_create_stompable_music_sound_inst_str, slf_action_create_stompable_music_sound_inst_str, (void*)0x89b808);
+	hook_slf_vtable(slf_deconstructor_create_str_list, slf_action_create_str_list, (void*)0x89c044);
+	hook_slf_vtable(slf_deconstructor_create_taunt_entry_entity_str_num, slf_action_create_taunt_entry_entity_str_num, (void*)0x89c63c);
+	hook_slf_vtable(slf_deconstructor_create_taunt_exchange_entity_entity_num_num_num_num_elip, slf_action_create_taunt_exchange_entity_entity_num_num_num_num_elip, (void*)0x89c6b4);
+	hook_slf_vtable(slf_deconstructor_create_taunt_exchange_list, slf_action_create_taunt_exchange_list, (void*)0x89c0dc);
+	hook_slf_vtable(slf_deconstructor_create_threat_assessment_meter, slf_action_create_threat_assessment_meter, (void*)0x89c6cc);
+	hook_slf_vtable(slf_deconstructor_create_time_limited_entity_str_num, slf_action_create_time_limited_entity_str_num, (void*)0x89af3c);
+	hook_slf_vtable(slf_deconstructor_create_trigger_entity_num, slf_action_create_trigger_entity_num, (void*)0x89b970);
+	hook_slf_vtable(slf_deconstructor_create_trigger_str_vector3d_num, slf_action_create_trigger_str_vector3d_num, (void*)0x89b968);
+	hook_slf_vtable(slf_deconstructor_create_trigger_vector3d_num, slf_action_create_trigger_vector3d_num, (void*)0x89b960);
+	hook_slf_vtable(slf_deconstructor_create_unstompable_script_cutscene_sound_inst_str, slf_action_create_unstompable_script_cutscene_sound_inst_str, (void*)0x89b810);
+	hook_slf_vtable(slf_deconstructor_create_vector3d_list, slf_action_create_vector3d_list, (void*)0x89becc);
+	hook_slf_vtable(slf_deconstructor_cross_vector3d_vector3d, slf_action_cross_vector3d_vector3d, (void*)0x89ba38);
+	hook_slf_vtable(slf_deconstructor_debug_breakpoint, slf_action_debug_breakpoint, (void*)0x89a510);
+	hook_slf_vtable(slf_deconstructor_debug_print_num_str, slf_action_debug_print_num_str, (void*)0x89a528);
+	hook_slf_vtable(slf_deconstructor_debug_print_num_vector3d_str, slf_action_debug_print_num_vector3d_str, (void*)0x89a530);
+	hook_slf_vtable(slf_deconstructor_debug_print_str, slf_action_debug_print_str, (void*)0x89a520);
+	hook_slf_vtable(slf_deconstructor_debug_print_set_background_color_vector3d, slf_action_debug_print_set_background_color_vector3d, (void*)0x89a538);
+	hook_slf_vtable(slf_deconstructor_delay_num, slf_action_delay_num, (void*)0x89a71c);
+	hook_slf_vtable(slf_deconstructor_destroy_credits, slf_action_destroy_credits, (void*)0x89baf0);
+	//hook_slf_vtable(slf_deconstructor_destroy_debug_menu_entry_debug_menu_entry, slf_action_destroy_debug_menu_entry_debug_menu_entry, (void*)0x89c71c);
+	hook_slf_vtable(slf_deconstructor_destroy_entity_entity, slf_action_destroy_entity_entity, (void*)0x89af34);
+	hook_slf_vtable(slf_deconstructor_destroy_entity_list_entity_list, slf_action_destroy_entity_list_entity_list, (void*)0x89bfd4);
+	hook_slf_vtable(slf_deconstructor_destroy_entity_tracker_entity_tracker, slf_action_destroy_entity_tracker_entity_tracker, (void*)0x89c59c);
+	hook_slf_vtable(slf_deconstructor_destroy_line_info_line_info, slf_action_destroy_line_info_line_info, (void*)0x89b710);
+	hook_slf_vtable(slf_deconstructor_destroy_num_list_num_list, slf_action_destroy_num_list_num_list, (void*)0x89bf5c);
+	hook_slf_vtable(slf_deconstructor_destroy_pfx_pfx, slf_action_destroy_pfx_pfx, (void*)0x89c914);
+	hook_slf_vtable(slf_deconstructor_destroy_str_list_str_list, slf_action_destroy_str_list_str_list, (void*)0x89c04c);
+	hook_slf_vtable(slf_deconstructor_destroy_taunt_entry_taunt_entry, slf_action_destroy_taunt_entry_taunt_entry, (void*)0x89c644);
+	hook_slf_vtable(slf_deconstructor_destroy_taunt_exchange_taunt_exchange, slf_action_destroy_taunt_exchange_taunt_exchange, (void*)0x89c6bc);
+	hook_slf_vtable(slf_deconstructor_destroy_taunt_exchange_list_taunt_exchange_list, slf_action_destroy_taunt_exchange_list_taunt_exchange_list, (void*)0x89c0e4);
+	hook_slf_vtable(slf_deconstructor_destroy_threat_assessment_meter_tam, slf_action_destroy_threat_assessment_meter_tam, (void*)0x89c6d4);
+	hook_slf_vtable(slf_deconstructor_destroy_trigger_trigger, slf_action_destroy_trigger_trigger, (void*)0x89b978);
+	hook_slf_vtable(slf_deconstructor_destroy_vector3d_list_vector3d_list, slf_action_destroy_vector3d_list_vector3d_list, (void*)0x89bedc);
+	hook_slf_vtable(slf_deconstructor_dilated_delay_num, slf_action_dilated_delay_num, (void*)0x89a72c);
+	hook_slf_vtable(slf_deconstructor_disable_marky_cam_num, slf_action_disable_marky_cam_num, (void*)0x89a5f4);
+	hook_slf_vtable(slf_deconstructor_disable_nearby_occlusion_only_obb_vector3d, slf_action_disable_nearby_occlusion_only_obb_vector3d, (void*)0x89a5e4);
+	hook_slf_vtable(slf_deconstructor_disable_player_shadows, slf_action_disable_player_shadows, (void*)0x89a614);
+	hook_slf_vtable(slf_deconstructor_disable_subtitles, slf_action_disable_subtitles, (void*)0x89a93c);
+	hook_slf_vtable(slf_deconstructor_disable_vibrator, slf_action_disable_vibrator, (void*)0x89a7dc);
+	hook_slf_vtable(slf_deconstructor_disable_zoom_map_num, slf_action_disable_zoom_map_num, (void*)0x89bbf0);
+	hook_slf_vtable(slf_deconstructor_distance3d_vector3d_vector3d, slf_action_distance3d_vector3d_vector3d, (void*)0x89ba48);
+	hook_slf_vtable(slf_deconstructor_distance_chase_widget_set_pos_num, slf_action_distance_chase_widget_set_pos_num, (void*)0x89bb88);
+	hook_slf_vtable(slf_deconstructor_distance_chase_widget_turn_off, slf_action_distance_chase_widget_turn_off, (void*)0x89bb80);
+	hook_slf_vtable(slf_deconstructor_distance_chase_widget_turn_on_num_num, slf_action_distance_chase_widget_turn_on_num_num, (void*)0x89bb78);
+	hook_slf_vtable(slf_deconstructor_distance_race_widget_set_boss_pos_num, slf_action_distance_race_widget_set_boss_pos_num, (void*)0x89bba8);
+	hook_slf_vtable(slf_deconstructor_distance_race_widget_set_hero_pos_num, slf_action_distance_race_widget_set_hero_pos_num, (void*)0x89bba0);
+	hook_slf_vtable(slf_deconstructor_distance_race_widget_set_types_num_num, slf_action_distance_race_widget_set_types_num_num, (void*)0x89bbb0);
+	hook_slf_vtable(slf_deconstructor_distance_race_widget_turn_off, slf_action_distance_race_widget_turn_off, (void*)0x89bb98);
+	hook_slf_vtable(slf_deconstructor_distance_race_widget_turn_on, slf_action_distance_race_widget_turn_on, (void*)0x89bb90);
+	hook_slf_vtable(slf_deconstructor_district_id_str, slf_action_district_id_str, (void*)0x89c47c);
+	hook_slf_vtable(slf_deconstructor_district_name_num, slf_action_district_name_num, (void*)0x89c484);
+	hook_slf_vtable(slf_deconstructor_dot_vector3d_vector3d, slf_action_dot_vector3d_vector3d, (void*)0x89ba30);
+	hook_slf_vtable(slf_deconstructor_dump_searchable_region_list_str, slf_action_dump_searchable_region_list_str, (void*)0x89a994);
+	hook_slf_vtable(slf_deconstructor_enable_ai_num, slf_action_enable_ai_num, (void*)0x89a6cc);
+	hook_slf_vtable(slf_deconstructor_enable_civilians_num, slf_action_enable_civilians_num, (void*)0x89c5ec);
+	hook_slf_vtable(slf_deconstructor_enable_controls_num, slf_action_enable_controls_num, (void*)0x89bd40);
+	hook_slf_vtable(slf_deconstructor_enable_entity_fading_num, slf_action_enable_entity_fading_num, (void*)0x89b05c);
+	hook_slf_vtable(slf_deconstructor_enable_interface_num, slf_action_enable_interface_num, (void*)0x89a6c4);
+	hook_slf_vtable(slf_deconstructor_enable_marky_cam_num, slf_action_enable_marky_cam_num, (void*)0x89a5bc);
+	hook_slf_vtable(slf_deconstructor_enable_mini_map_num, slf_action_enable_mini_map_num, (void*)0x89bbe8);
+	hook_slf_vtable(slf_deconstructor_enable_nearby_occlusion_only_obb_vector3d, slf_action_enable_nearby_occlusion_only_obb_vector3d, (void*)0x89a5dc);
+	hook_slf_vtable(slf_deconstructor_enable_obb_vector3d_num, slf_action_enable_obb_vector3d_num, (void*)0x89a588);
+	hook_slf_vtable(slf_deconstructor_enable_pause_num, slf_action_enable_pause_num, (void*)0x89a6ac);
+	hook_slf_vtable(slf_deconstructor_enable_physics_num, slf_action_enable_physics_num, (void*)0x89a6dc);
+	hook_slf_vtable(slf_deconstructor_enable_player_shadows, slf_action_enable_player_shadows, (void*)0x89a61c);
+	hook_slf_vtable(slf_deconstructor_enable_pois_num, slf_action_enable_pois_num, (void*)0x89a6ec);
+	hook_slf_vtable(slf_deconstructor_enable_quad_path_connector_district_num_district_num_num, slf_action_enable_quad_path_connector_district_num_district_num_num, (void*)0x89a578);
+	hook_slf_vtable(slf_deconstructor_enable_subtitles, slf_action_enable_subtitles, (void*)0x89a934);
+	hook_slf_vtable(slf_deconstructor_enable_tokens_of_type_num_num, slf_action_enable_tokens_of_type_num_num, (void*)0x89b54c);
+	hook_slf_vtable(slf_deconstructor_enable_traffic_num, slf_action_enable_traffic_num, (void*)0x89c5fc);
+	hook_slf_vtable(slf_deconstructor_enable_user_camera_num, slf_action_enable_user_camera_num, (void*)0x89a5d4);
+	hook_slf_vtable(slf_deconstructor_enable_vibrator, slf_action_enable_vibrator, (void*)0x89a7e4);
+	hook_slf_vtable(slf_deconstructor_end_current_patrol, slf_action_end_current_patrol, (void*)0x89c4fc);
+	hook_slf_vtable(slf_deconstructor_end_cut_scenes, slf_action_end_cut_scenes, (void*)0x89b7c8);
+	hook_slf_vtable(slf_deconstructor_end_screen_recording, slf_action_end_screen_recording, (void*)0x89b7b8);
+	hook_slf_vtable(slf_deconstructor_entity_col_check_entity_entity, slf_action_entity_col_check_entity_entity, (void*)0x89a88c);
+	hook_slf_vtable(slf_deconstructor_entity_exists_str, slf_action_entity_exists_str, (void*)0x89af24);
+	hook_slf_vtable(slf_deconstructor_entity_get_entity_tracker_entity, slf_action_entity_get_entity_tracker_entity, (void*)0x89b034);
+	hook_slf_vtable(slf_deconstructor_entity_has_entity_tracker_entity, slf_action_entity_has_entity_tracker_entity, (void*)0x89b02c);
+	hook_slf_vtable(slf_deconstructor_exit_water_entity, slf_action_exit_water_entity, (void*)0x89a604);
+	hook_slf_vtable(slf_deconstructor_find_closest_point_on_a_path_to_point_vector3d, slf_action_find_closest_point_on_a_path_to_point_vector3d, (void*)0x89a570);
+	hook_slf_vtable(slf_deconstructor_find_district_for_point_vector3d, slf_action_find_district_for_point_vector3d, (void*)0x89a81c);
+	hook_slf_vtable(slf_deconstructor_find_entities_in_radius_entity_list_vector3d_num_num, slf_action_find_entities_in_radius_entity_list_vector3d_num_num, (void*)0x89b46c);
+	hook_slf_vtable(slf_deconstructor_find_entity_str, slf_action_find_entity_str, (void*)0x89af1c);
+	hook_slf_vtable(slf_deconstructor_find_innermost_district_vector3d, slf_action_find_innermost_district_vector3d, (void*)0x89a824);
+	hook_slf_vtable(slf_deconstructor_find_outermost_district_vector3d, slf_action_find_outermost_district_vector3d, (void*)0x89a82c);
+	hook_slf_vtable(slf_deconstructor_find_trigger_entity, slf_action_find_trigger_entity, (void*)0x89b950);
+	hook_slf_vtable(slf_deconstructor_find_trigger_str, slf_action_find_trigger_str, (void*)0x89b948);
+	hook_slf_vtable(slf_deconstructor_find_trigger_in_district_district_str, slf_action_find_trigger_in_district_district_str, (void*)0x89b958);
+	hook_slf_vtable(slf_deconstructor_float_random_num, slf_action_float_random_num, (void*)0x89a74c);
+	hook_slf_vtable(slf_deconstructor_force_mission_district_str_num, slf_action_force_mission_district_str_num, (void*)0x89c3b4);
+	hook_slf_vtable(slf_deconstructor_force_streamer_refresh, slf_action_force_streamer_refresh, (void*)0x89c4ac);
+	hook_slf_vtable(slf_deconstructor_format_time_string_num, slf_action_format_time_string_num, (void*)0x89bc74);
+	hook_slf_vtable(slf_deconstructor_freeze_hero_num, slf_action_freeze_hero_num, (void*)0x89a5fc);
+	hook_slf_vtable(slf_deconstructor_game_ini_get_flag_str, slf_action_game_ini_get_flag_str, (void*)0x89a97c);
+	hook_slf_vtable(slf_deconstructor_game_time_advance_num_num, slf_action_game_time_advance_num_num, (void*)0x89c4dc);
+	hook_slf_vtable(slf_deconstructor_get_all_execs_thread_count_str, slf_action_get_all_execs_thread_count_str, (void*)0x89a9ec);
+	hook_slf_vtable(slf_deconstructor_get_all_instances_thread_count_str, slf_action_get_all_instances_thread_count_str, (void*)0x89a9e4);
+	hook_slf_vtable(slf_deconstructor_get_attacker_entity, slf_action_get_attacker_entity, (void*)0x89aa24);
+	hook_slf_vtable(slf_deconstructor_get_attacker_member, slf_action_get_attacker_member, (void*)0x89aa2c);
+	hook_slf_vtable(slf_deconstructor_get_available_stack_size, slf_action_get_available_stack_size, (void*)0x89c4ec);
+	hook_slf_vtable(slf_deconstructor_get_character_packname_list, slf_action_get_character_packname_list, (void*)0x89c354);
+	hook_slf_vtable(slf_deconstructor_get_closest_point_on_lane_with_facing_num_vector3d_vector3d_list, slf_action_get_closest_point_on_lane_with_facing_num_vector3d_vector3d_list, (void*)0x89c61c);
+	hook_slf_vtable(slf_deconstructor_get_col_hit_ent, slf_action_get_col_hit_ent, (void*)0x89a884);
+	hook_slf_vtable(slf_deconstructor_get_col_hit_norm, slf_action_get_col_hit_norm, (void*)0x89a87c);
+	hook_slf_vtable(slf_deconstructor_get_col_hit_pos, slf_action_get_col_hit_pos, (void*)0x89a874);
+	hook_slf_vtable(slf_deconstructor_get_control_state_num, slf_action_get_control_state_num, (void*)0x89a7f4);
+	hook_slf_vtable(slf_deconstructor_get_control_trigger_num, slf_action_get_control_trigger_num, (void*)0x89a7ec);
+	hook_slf_vtable(slf_deconstructor_get_current_instance_thread_count_str, slf_action_get_current_instance_thread_count_str, (void*)0x89a9dc);
+	hook_slf_vtable(slf_deconstructor_get_current_view_cam_pos, slf_action_get_current_view_cam_pos, (void*)0x89a5b4);
+	hook_slf_vtable(slf_deconstructor_get_current_view_cam_x_facing, slf_action_get_current_view_cam_x_facing, (void*)0x89a59c);
+	hook_slf_vtable(slf_deconstructor_get_current_view_cam_y_facing, slf_action_get_current_view_cam_y_facing, (void*)0x89a5a4);
+	hook_slf_vtable(slf_deconstructor_get_current_view_cam_z_facing, slf_action_get_current_view_cam_z_facing, (void*)0x89a5ac);
+	hook_slf_vtable(slf_deconstructor_get_fog_color, slf_action_get_fog_color, (void*)0x89a8f4);
+	hook_slf_vtable(slf_deconstructor_get_fog_distance, slf_action_get_fog_distance, (void*)0x89a8fc);
+	hook_slf_vtable(slf_deconstructor_get_game_info_num_str, slf_action_get_game_info_num_str, (void*)0x89a8c4);
+	hook_slf_vtable(slf_deconstructor_get_game_info_str_str, slf_action_get_game_info_str_str, (void*)0x89a8d4);
+	hook_slf_vtable(slf_deconstructor_get_glam_cam_num, slf_action_get_glam_cam_num, (void*)0x89b780);
+	hook_slf_vtable(slf_deconstructor_get_global_time_dilation, slf_action_get_global_time_dilation, (void*)0x89a894);
+	hook_slf_vtable(slf_deconstructor_get_ini_flag_str, slf_action_get_ini_flag_str, (void*)0x89a94c);
+	hook_slf_vtable(slf_deconstructor_get_ini_num_str, slf_action_get_ini_num_str, (void*)0x89a954);
+	hook_slf_vtable(slf_deconstructor_get_int_num_num, slf_action_get_int_num_num, (void*)0x89a92c);
+	hook_slf_vtable(slf_deconstructor_get_mission_camera_marker_num, slf_action_get_mission_camera_marker_num, (void*)0x89c414);
+	hook_slf_vtable(slf_deconstructor_get_mission_camera_transform_marker_num, slf_action_get_mission_camera_transform_marker_num, (void*)0x89c454);
+	hook_slf_vtable(slf_deconstructor_get_mission_entity, slf_action_get_mission_entity, (void*)0x89c38c);
+	hook_slf_vtable(slf_deconstructor_get_mission_key_posfacing3d, slf_action_get_mission_key_posfacing3d, (void*)0x89c36c);
+	hook_slf_vtable(slf_deconstructor_get_mission_key_position, slf_action_get_mission_key_position, (void*)0x89c364);
+	hook_slf_vtable(slf_deconstructor_get_mission_marker_num, slf_action_get_mission_marker_num, (void*)0x89c40c);
+	hook_slf_vtable(slf_deconstructor_get_mission_nums, slf_action_get_mission_nums, (void*)0x89c3ac);
+	hook_slf_vtable(slf_deconstructor_get_mission_patrol_waypoint, slf_action_get_mission_patrol_waypoint, (void*)0x89c384);
+	hook_slf_vtable(slf_deconstructor_get_mission_positions, slf_action_get_mission_positions, (void*)0x89c39c);
+	hook_slf_vtable(slf_deconstructor_get_mission_strings, slf_action_get_mission_strings, (void*)0x89c3a4);
+	hook_slf_vtable(slf_deconstructor_get_mission_transform_marker_num, slf_action_get_mission_transform_marker_num, (void*)0x89c42c);
+	hook_slf_vtable(slf_deconstructor_get_mission_trigger, slf_action_get_mission_trigger, (void*)0x89c394);
+	hook_slf_vtable(slf_deconstructor_get_missions_key_position_by_index_district_str_num, slf_action_get_missions_key_position_by_index_district_str_num, (void*)0x89c3bc);
+	hook_slf_vtable(slf_deconstructor_get_missions_nums_by_index_district_str_num_num_list, slf_action_get_missions_nums_by_index_district_str_num_num_list, (void*)0x89c3cc);
+	hook_slf_vtable(slf_deconstructor_get_missions_patrol_waypoint_by_index_district_str_num, slf_action_get_missions_patrol_waypoint_by_index_district_str_num, (void*)0x89c3c4);
+	hook_slf_vtable(slf_deconstructor_get_neighborhood_name_num, slf_action_get_neighborhood_name_num, (void*)0x89c54c);
+	hook_slf_vtable(slf_deconstructor_get_num_free_slots_str, slf_action_get_num_free_slots_str, (void*)0x89c3e4);
+	hook_slf_vtable(slf_deconstructor_get_num_mission_transform_marker, slf_action_get_num_mission_transform_marker, (void*)0x89c434);
+	hook_slf_vtable(slf_deconstructor_get_pack_group_str, slf_action_get_pack_group_str, (void*)0x89c3ec);
+	hook_slf_vtable(slf_deconstructor_get_pack_size_str, slf_action_get_pack_size_str, (void*)0x89c4e4);
+	hook_slf_vtable(slf_deconstructor_get_patrol_difficulty_str, slf_action_get_patrol_difficulty_str, (void*)0x89c534);
+	hook_slf_vtable(slf_deconstructor_get_patrol_node_position_by_index_str_num, slf_action_get_patrol_node_position_by_index_str_num, (void*)0x89c52c);
+	hook_slf_vtable(slf_deconstructor_get_patrol_start_position_str, slf_action_get_patrol_start_position_str, (void*)0x89c524);
+	hook_slf_vtable(slf_deconstructor_get_patrol_unlock_threshold_str, slf_action_get_patrol_unlock_threshold_str, (void*)0x89c53c);
+	hook_slf_vtable(slf_deconstructor_get_platform, slf_action_get_platform, (void*)0x89a508);
+	hook_slf_vtable(slf_deconstructor_get_render_opt_num_str, slf_action_get_render_opt_num_str, (void*)0x89a8e4);
+	hook_slf_vtable(slf_deconstructor_get_spider_reflexes_spiderman_time_dilation, slf_action_get_spider_reflexes_spiderman_time_dilation, (void*)0x89cac4);
+	hook_slf_vtable(slf_deconstructor_get_spider_reflexes_world_time_dilation, slf_action_get_spider_reflexes_world_time_dilation, (void*)0x89cad4);
+	hook_slf_vtable(slf_deconstructor_get_time_inc, slf_action_get_time_inc, (void*)0x89a7a4);
+	hook_slf_vtable(slf_deconstructor_get_time_of_day, slf_action_get_time_of_day, (void*)0x89a974);
+	hook_slf_vtable(slf_deconstructor_get_time_of_day_rate, slf_action_get_time_of_day_rate, (void*)0x89a96c);
+	hook_slf_vtable(slf_deconstructor_get_token_index_from_id_num_num, slf_action_get_token_index_from_id_num_num, (void*)0x89b554);
+	hook_slf_vtable(slf_deconstructor_get_traffic_spawn_point_near_camera_vector3d_list, slf_action_get_traffic_spawn_point_near_camera_vector3d_list, (void*)0x89aa98);
+	hook_slf_vtable(slf_deconstructor_greater_than_or_equal_rounded_num_num, slf_action_greater_than_or_equal_rounded_num_num, (void*)0x89bc90);
+	hook_slf_vtable(slf_deconstructor_hard_break, slf_action_hard_break, (void*)0x89aa1c);
+	hook_slf_vtable(slf_deconstructor_has_substring_str_str, slf_action_has_substring_str_str, (void*)0x89a580);
+	hook_slf_vtable(slf_deconstructor_hero, slf_action_hero, (void*)0x89aed4);
+	hook_slf_vtable(slf_deconstructor_hero_exists, slf_action_hero_exists, (void*)0x89aedc);
+	hook_slf_vtable(slf_deconstructor_hero_type, slf_action_hero_type, (void*)0x89aee4);
+	hook_slf_vtable(slf_deconstructor_hide_controller_gauge, slf_action_hide_controller_gauge, (void*)0x89bb20);
+	hook_slf_vtable(slf_deconstructor_initialize_encounter_object, slf_action_initialize_encounter_object, (void*)0x89aa0c);
+	hook_slf_vtable(slf_deconstructor_initialize_encounter_objects, slf_action_initialize_encounter_objects, (void*)0x89aa04);
+	hook_slf_vtable(slf_deconstructor_insert_pack_str, slf_action_insert_pack_str, (void*)0x89c3d4);
+	hook_slf_vtable(slf_deconstructor_invoke_pause_menu_unlockables, slf_action_invoke_pause_menu_unlockables, (void*)0x89bc98);
+	hook_slf_vtable(slf_deconstructor_is_ai_enabled, slf_action_is_ai_enabled, (void*)0x89a6d4);
+	hook_slf_vtable(slf_deconstructor_is_cut_scene_playing, slf_action_is_cut_scene_playing, (void*)0x89b7d0);
+	hook_slf_vtable(slf_deconstructor_is_district_loaded_num, slf_action_is_district_loaded_num, (void*)0x89c49c);
+	hook_slf_vtable(slf_deconstructor_is_hero_frozen, slf_action_is_hero_frozen, (void*)0x89a60c);
+	hook_slf_vtable(slf_deconstructor_is_hero_peter_parker, slf_action_is_hero_peter_parker, (void*)0x89aefc);
+	hook_slf_vtable(slf_deconstructor_is_hero_spidey, slf_action_is_hero_spidey, (void*)0x89aeec);
+	hook_slf_vtable(slf_deconstructor_is_hero_venom, slf_action_is_hero_venom, (void*)0x89aef4);
+	hook_slf_vtable(slf_deconstructor_is_marky_cam_enabled, slf_action_is_marky_cam_enabled, (void*)0x89a5c4);
+	hook_slf_vtable(slf_deconstructor_is_mission_active, slf_action_is_mission_active, (void*)0x89c50c);
+	hook_slf_vtable(slf_deconstructor_is_mission_loading, slf_action_is_mission_loading, (void*)0x89c514);
+	hook_slf_vtable(slf_deconstructor_is_pack_available_str, slf_action_is_pack_available_str, (void*)0x89c404);
+	hook_slf_vtable(slf_deconstructor_is_pack_loaded_str, slf_action_is_pack_loaded_str, (void*)0x89c3fc);
+	hook_slf_vtable(slf_deconstructor_is_pack_pushed_str, slf_action_is_pack_pushed_str, (void*)0x89c34c);
+	hook_slf_vtable(slf_deconstructor_is_path_graph_inside_glass_house_str, slf_action_is_path_graph_inside_glass_house_str, (void*)0x89aaa0);
+	hook_slf_vtable(slf_deconstructor_is_patrol_active, slf_action_is_patrol_active, (void*)0x89c504);
+	hook_slf_vtable(slf_deconstructor_is_patrol_node_empty_num, slf_action_is_patrol_node_empty_num, (void*)0x89c544);
+	hook_slf_vtable(slf_deconstructor_is_paused, slf_action_is_paused, (void*)0x89a6b4);
+	hook_slf_vtable(slf_deconstructor_is_physics_enabled, slf_action_is_physics_enabled, (void*)0x89a6e4);
+	hook_slf_vtable(slf_deconstructor_is_point_inside_glass_house_vector3d, slf_action_is_point_inside_glass_house_vector3d, (void*)0x89a540);
+	hook_slf_vtable(slf_deconstructor_is_point_under_water_vector3d, slf_action_is_point_under_water_vector3d, (void*)0x89aa3c);
+	hook_slf_vtable(slf_deconstructor_is_user_camera_enabled, slf_action_is_user_camera_enabled, (void*)0x89a5cc);
+	hook_slf_vtable(slf_deconstructor_load_anim_str, slf_action_load_anim_str, (void*)0x89aaf0);
+	hook_slf_vtable(slf_deconstructor_load_level_str_vector3d, slf_action_load_level_str_vector3d, (void*)0x89a8ac);
+	hook_slf_vtable(slf_deconstructor_lock_all_districts, slf_action_lock_all_districts, (void*)0x89c4c4);
+	hook_slf_vtable(slf_deconstructor_lock_district_num, slf_action_lock_district_num, (void*)0x89c494);
+	hook_slf_vtable(slf_deconstructor_lock_mission_manager_num, slf_action_lock_mission_manager_num, (void*)0x89c51c);
+	hook_slf_vtable(slf_deconstructor_los_check_vector3d_vector3d, slf_action_los_check_vector3d_vector3d, (void*)0x89a814);
+	hook_slf_vtable(slf_deconstructor_lower_hotpursuit_indicator_level, slf_action_lower_hotpursuit_indicator_level, (void*)0x89bae0);
+	hook_slf_vtable(slf_deconstructor_malor_vector3d_num, slf_action_malor_vector3d_num, (void*)0x89a984);
+	hook_slf_vtable(slf_deconstructor_normal_vector3d, slf_action_normal_vector3d, (void*)0x89ba40);
+	hook_slf_vtable(slf_deconstructor_pause_game_num, slf_action_pause_game_num, (void*)0x89a6bc);
+	hook_slf_vtable(slf_deconstructor_play_credits, slf_action_play_credits, (void*)0x89baf8);
+	hook_slf_vtable(slf_deconstructor_play_prerender_str, slf_action_play_prerender_str, (void*)0x89a8b4);
+	hook_slf_vtable(slf_deconstructor_pop_pack_str, slf_action_pop_pack_str, (void*)0x89c344);
+	hook_slf_vtable(slf_deconstructor_post_message_str_num, slf_action_post_message_str_num, (void*)0x89a73c);
+	hook_slf_vtable(slf_deconstructor_pre_roll_all_pfx_num, slf_action_pre_roll_all_pfx_num, (void*)0x89aa34);
+	hook_slf_vtable(slf_deconstructor_press_controller_gauge_num, slf_action_press_controller_gauge_num, (void*)0x89bb28);
+	hook_slf_vtable(slf_deconstructor_press_controller_gauge_num_num_num, slf_action_press_controller_gauge_num_num_num, (void*)0x89bb30);
+	hook_slf_vtable(slf_deconstructor_purge_district_num, slf_action_purge_district_num, (void*)0x89c4bc);
+	hook_slf_vtable(slf_deconstructor_push_pack_str, slf_action_push_pack_str, (void*)0x89c334);
+	hook_slf_vtable(slf_deconstructor_push_pack_into_district_slot_str, slf_action_push_pack_into_district_slot_str, (void*)0x89c33c);
+	hook_slf_vtable(slf_deconstructor_raise_hotpursuit_indicator_level, slf_action_raise_hotpursuit_indicator_level, (void*)0x89bad8);
+	hook_slf_vtable(slf_deconstructor_random_num, slf_action_random_num, (void*)0x89a744);
+	hook_slf_vtable(slf_deconstructor_remove_civilian_info_num, slf_action_remove_civilian_info_num, (void*)0x89c5c4);
+	hook_slf_vtable(slf_deconstructor_remove_civilian_info_entity_entity_num, slf_action_remove_civilian_info_entity_entity_num, (void*)0x89c5d4);
+	hook_slf_vtable(slf_deconstructor_remove_glass_house_str, slf_action_remove_glass_house_str, (void*)0x89a568);
+	hook_slf_vtable(slf_deconstructor_remove_item_entity_from_world_entity, slf_action_remove_item_entity_from_world_entity, (void*)0x89affc);
+	hook_slf_vtable(slf_deconstructor_remove_pack_str, slf_action_remove_pack_str, (void*)0x89c3dc);
+	hook_slf_vtable(slf_deconstructor_remove_traffic_model_num, slf_action_remove_traffic_model_num, (void*)0x89c5ac);
+	hook_slf_vtable(slf_deconstructor_reset_externed_alses, slf_action_reset_externed_alses, (void*)0x89b064);
+	hook_slf_vtable(slf_deconstructor_set_all_anchors_activated_num, slf_action_set_all_anchors_activated_num, (void*)0x89caec);
+	hook_slf_vtable(slf_deconstructor_set_blur_num, slf_action_set_blur_num, (void*)0x89a63c);
+	hook_slf_vtable(slf_deconstructor_set_blur_blend_mode_num, slf_action_set_blur_blend_mode_num, (void*)0x89a664);
+	hook_slf_vtable(slf_deconstructor_set_blur_color_vector3d, slf_action_set_blur_color_vector3d, (void*)0x89a644);
+	hook_slf_vtable(slf_deconstructor_set_blur_offset_num_num, slf_action_set_blur_offset_num_num, (void*)0x89a654);
+	hook_slf_vtable(slf_deconstructor_set_blur_rot_num, slf_action_set_blur_rot_num, (void*)0x89a65c);
+	hook_slf_vtable(slf_deconstructor_set_blur_scale_num_num, slf_action_set_blur_scale_num_num, (void*)0x89a64c);
+	hook_slf_vtable(slf_deconstructor_set_clear_color_vector3d, slf_action_set_clear_color_vector3d, (void*)0x89a6f4);
+	hook_slf_vtable(slf_deconstructor_set_current_mission_objective_caption_num, slf_action_set_current_mission_objective_caption_num, (void*)0x89cadc);
+	hook_slf_vtable(slf_deconstructor_set_default_traffic_hitpoints_num, slf_action_set_default_traffic_hitpoints_num, (void*)0x89c614);
+	hook_slf_vtable(slf_deconstructor_set_dialog_box_flavor_num, slf_action_set_dialog_box_flavor_num, (void*)0x89bc5c);
+	hook_slf_vtable(slf_deconstructor_set_dialog_box_lockout_time_num, slf_action_set_dialog_box_lockout_time_num, (void*)0x89bc6c);
+	hook_slf_vtable(slf_deconstructor_set_engine_property_str_num, slf_action_set_engine_property_str_num, (void*)0x89a99c);
+	hook_slf_vtable(slf_deconstructor_set_fov_num, slf_action_set_fov_num, (void*)0x89a62c);
+	hook_slf_vtable(slf_deconstructor_set_game_info_num_str_num, slf_action_set_game_info_num_str_num, (void*)0x89a8bc);
+	hook_slf_vtable(slf_deconstructor_set_game_info_str_str_str, slf_action_set_game_info_str_str_str, (void*)0x89a8cc);
+	hook_slf_vtable(slf_deconstructor_set_global_time_dilation_num, slf_action_set_global_time_dilation_num, (void*)0x89a89c);
+	hook_slf_vtable(slf_deconstructor_set_marky_cam_lookat_vector3d, slf_action_set_marky_cam_lookat_vector3d, (void*)0x89a5ec);
+	hook_slf_vtable(slf_deconstructor_set_max_streaming_distance_num, slf_action_set_max_streaming_distance_num, (void*)0x89c4b4);
+	hook_slf_vtable(slf_deconstructor_set_mission_key_pos_facing_vector3d_vector3d, slf_action_set_mission_key_pos_facing_vector3d_vector3d, (void*)0x89c37c);
+	hook_slf_vtable(slf_deconstructor_set_mission_key_position_vector3d, slf_action_set_mission_key_position_vector3d, (void*)0x89c374);
+	hook_slf_vtable(slf_deconstructor_set_mission_text_num_elip, slf_action_set_mission_text_num_elip, (void*)0x89bbf8);
+	hook_slf_vtable(slf_deconstructor_set_mission_text_box_flavor_num, slf_action_set_mission_text_box_flavor_num, (void*)0x89bc64);
+	hook_slf_vtable(slf_deconstructor_set_mission_text_debug_str, slf_action_set_mission_text_debug_str, (void*)0x89bc00);
+	hook_slf_vtable(slf_deconstructor_set_parking_density_num, slf_action_set_parking_density_num, (void*)0x89c60c);
+	hook_slf_vtable(slf_deconstructor_set_pedestrian_density_num, slf_action_set_pedestrian_density_num, (void*)0x89c5f4);
+	hook_slf_vtable(slf_deconstructor_set_render_opt_num_str_num, slf_action_set_render_opt_num_str_num, (void*)0x89a8dc);
+	hook_slf_vtable(slf_deconstructor_set_score_widget_score_num, slf_action_set_score_widget_score_num, (void*)0x89bac8);
+	hook_slf_vtable(slf_deconstructor_set_sound_category_volume_num_num_num, slf_action_set_sound_category_volume_num_num_num, (void*)0x89a9d4);
+	hook_slf_vtable(slf_deconstructor_set_spider_reflexes_blur_num, slf_action_set_spider_reflexes_blur_num, (void*)0x89a674);
+	hook_slf_vtable(slf_deconstructor_set_spider_reflexes_blur_blend_mode_num, slf_action_set_spider_reflexes_blur_blend_mode_num, (void*)0x89a69c);
+	hook_slf_vtable(slf_deconstructor_set_spider_reflexes_blur_color_vector3d, slf_action_set_spider_reflexes_blur_color_vector3d, (void*)0x89a67c);
+	hook_slf_vtable(slf_deconstructor_set_spider_reflexes_blur_offset_num_num, slf_action_set_spider_reflexes_blur_offset_num_num, (void*)0x89a68c);
+	hook_slf_vtable(slf_deconstructor_set_spider_reflexes_blur_rot_num, slf_action_set_spider_reflexes_blur_rot_num, (void*)0x89a694);
+	hook_slf_vtable(slf_deconstructor_set_spider_reflexes_blur_scale_num_num, slf_action_set_spider_reflexes_blur_scale_num_num, (void*)0x89a684);
+	hook_slf_vtable(slf_deconstructor_set_spider_reflexes_hero_meter_depletion_rate_num, slf_action_set_spider_reflexes_hero_meter_depletion_rate_num, (void*)0x89cab4);
+	hook_slf_vtable(slf_deconstructor_set_spider_reflexes_spiderman_time_dilation_num, slf_action_set_spider_reflexes_spiderman_time_dilation_num, (void*)0x89cabc);
+	hook_slf_vtable(slf_deconstructor_set_spider_reflexes_world_time_dilation_num, slf_action_set_spider_reflexes_world_time_dilation_num, (void*)0x89cacc);
+	hook_slf_vtable(slf_deconstructor_set_state_of_the_story_caption_num, slf_action_set_state_of_the_story_caption_num, (void*)0x89cae4);
+	hook_slf_vtable(slf_deconstructor_set_target_info_entity_vector3d_vector3d, slf_action_set_target_info_entity_vector3d_vector3d, (void*)0x89b6c4);
+	hook_slf_vtable(slf_deconstructor_set_time_of_day_num, slf_action_set_time_of_day_num, (void*)0x89a964);
+	hook_slf_vtable(slf_deconstructor_set_traffic_density_num, slf_action_set_traffic_density_num, (void*)0x89c604);
+	hook_slf_vtable(slf_deconstructor_set_traffic_model_usage_num_num, slf_action_set_traffic_model_usage_num_num, (void*)0x89c5b4);
+	hook_slf_vtable(slf_deconstructor_set_vibration_resume_num, slf_action_set_vibration_resume_num, (void*)0x89a7d4);
+	hook_slf_vtable(slf_deconstructor_set_whoosh_interp_rate_num, slf_action_set_whoosh_interp_rate_num, (void*)0x89b504);
+	hook_slf_vtable(slf_deconstructor_set_whoosh_pitch_range_num_num, slf_action_set_whoosh_pitch_range_num_num, (void*)0x89b4fc);
+	hook_slf_vtable(slf_deconstructor_set_whoosh_speed_range_num_num, slf_action_set_whoosh_speed_range_num_num, (void*)0x89b4ec);
+	hook_slf_vtable(slf_deconstructor_set_whoosh_volume_range_num_num, slf_action_set_whoosh_volume_range_num_num, (void*)0x89b4f4);
+	hook_slf_vtable(slf_deconstructor_set_zoom_num, slf_action_set_zoom_num, (void*)0x89a624);
+	hook_slf_vtable(slf_deconstructor_show_controller_gauge, slf_action_show_controller_gauge, (void*)0x89bb18);
+	hook_slf_vtable(slf_deconstructor_show_hotpursuit_indicator_num, slf_action_show_hotpursuit_indicator_num, (void*)0x89bad0);
+	hook_slf_vtable(slf_deconstructor_show_score_widget_num, slf_action_show_score_widget_num, (void*)0x89bac0);
+	hook_slf_vtable(slf_deconstructor_shut_up_all_ai_voice_boxes, slf_action_shut_up_all_ai_voice_boxes, (void*)0x89b50c);
+	hook_slf_vtable(slf_deconstructor_sin_num, slf_action_sin_num, (void*)0x89a904);
+	hook_slf_vtable(slf_deconstructor_sin_cos_num, slf_action_sin_cos_num, (void*)0x89a924);
+	hook_slf_vtable(slf_deconstructor_soft_load_num, slf_action_soft_load_num, (void*)0x89bcbc);
+	hook_slf_vtable(slf_deconstructor_soft_save_num, slf_action_soft_save_num, (void*)0x89bcb4);
+	hook_slf_vtable(slf_deconstructor_spiderman_add_hero_points_num, slf_action_spiderman_add_hero_points_num, (void*)0x89caa4);
+	hook_slf_vtable(slf_deconstructor_spiderman_bank_stylepoints, slf_action_spiderman_bank_stylepoints, (void*)0x89c91c);
+	hook_slf_vtable(slf_deconstructor_spiderman_break_web, slf_action_spiderman_break_web, (void*)0x89c9e4);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_add_shake_num_num_num, slf_action_spiderman_camera_add_shake_num_num_num, (void*)0x89cb34);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_autocorrect_num, slf_action_spiderman_camera_autocorrect_num, (void*)0x89c924);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_clear_fixedstatic, slf_action_spiderman_camera_clear_fixedstatic, (void*)0x89cafc);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_enable_combat_num, slf_action_spiderman_camera_enable_combat_num, (void*)0x89cb24);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_enable_lookaround_num, slf_action_spiderman_camera_enable_lookaround_num, (void*)0x89cb1c);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_set_fixedstatic_vector3d_vector3d, slf_action_spiderman_camera_set_fixedstatic_vector3d_vector3d, (void*)0x89caf4);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_set_follow_entity, slf_action_spiderman_camera_set_follow_entity, (void*)0x89cb2c);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_set_hero_underwater_num, slf_action_spiderman_camera_set_hero_underwater_num, (void*)0x89cb3c);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_set_interpolation_time_num, slf_action_spiderman_camera_set_interpolation_time_num, (void*)0x89cb14);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_set_lockon_min_distance_num, slf_action_spiderman_camera_set_lockon_min_distance_num, (void*)0x89cb04);
+	hook_slf_vtable(slf_deconstructor_spiderman_camera_set_lockon_y_offset_num, slf_action_spiderman_camera_set_lockon_y_offset_num, (void*)0x89cb0c);
+	hook_slf_vtable(slf_deconstructor_spiderman_charged_jump, slf_action_spiderman_charged_jump, (void*)0x89c98c);
+	hook_slf_vtable(slf_deconstructor_spiderman_enable_control_button_num_num, slf_action_spiderman_enable_control_button_num_num, (void*)0x89ca94);
+	hook_slf_vtable(slf_deconstructor_spiderman_enable_lockon_num, slf_action_spiderman_enable_lockon_num, (void*)0x89c9ac);
+	hook_slf_vtable(slf_deconstructor_spiderman_engage_lockon_num, slf_action_spiderman_engage_lockon_num, (void*)0x89c9b4);
+	hook_slf_vtable(slf_deconstructor_spiderman_engage_lockon_num_entity, slf_action_spiderman_engage_lockon_num_entity, (void*)0x89c9bc);
+	hook_slf_vtable(slf_deconstructor_spiderman_get_hero_points, slf_action_spiderman_get_hero_points, (void*)0x89ca9c);
+	hook_slf_vtable(slf_deconstructor_spiderman_get_max_zip_length, slf_action_spiderman_get_max_zip_length, (void*)0x89c9dc);
+	hook_slf_vtable(slf_deconstructor_spiderman_get_spidey_sense_level, slf_action_spiderman_get_spidey_sense_level, (void*)0x89c99c);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_crawling, slf_action_spiderman_is_crawling, (void*)0x89c934);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_falling, slf_action_spiderman_is_falling, (void*)0x89c964);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_jumping, slf_action_spiderman_is_jumping, (void*)0x89c96c);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_on_ceiling, slf_action_spiderman_is_on_ceiling, (void*)0x89c944);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_on_ground, slf_action_spiderman_is_on_ground, (void*)0x89c94c);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_on_wall, slf_action_spiderman_is_on_wall, (void*)0x89c93c);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_running, slf_action_spiderman_is_running, (void*)0x89c95c);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_sprint_crawling, slf_action_spiderman_is_sprint_crawling, (void*)0x89c984);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_sprinting, slf_action_spiderman_is_sprinting, (void*)0x89c974);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_swinging, slf_action_spiderman_is_swinging, (void*)0x89c954);
+	hook_slf_vtable(slf_deconstructor_spiderman_is_wallsprinting, slf_action_spiderman_is_wallsprinting, (void*)0x89c97c);
+	hook_slf_vtable(slf_deconstructor_spiderman_lock_spider_reflexes_off, slf_action_spiderman_lock_spider_reflexes_off, (void*)0x89ca24);
+	hook_slf_vtable(slf_deconstructor_spiderman_lock_spider_reflexes_on, slf_action_spiderman_lock_spider_reflexes_on, (void*)0x89ca1c);
+	hook_slf_vtable(slf_deconstructor_spiderman_lockon_camera_engaged, slf_action_spiderman_lockon_camera_engaged, (void*)0x89ca0c);
+	hook_slf_vtable(slf_deconstructor_spiderman_lockon_mode_engaged, slf_action_spiderman_lockon_mode_engaged, (void*)0x89ca04);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_camera_target_entity, slf_action_spiderman_set_camera_target_entity, (void*)0x89ca14);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_desired_mode_num_vector3d_vector3d, slf_action_spiderman_set_desired_mode_num_vector3d_vector3d, (void*)0x89c9ec);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_health_beep_min_max_cooldown_time_num_num, slf_action_spiderman_set_health_beep_min_max_cooldown_time_num_num, (void*)0x89c9f4);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_health_beep_threshold_num, slf_action_spiderman_set_health_beep_threshold_num, (void*)0x89c9fc);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_hero_meter_empty_rate_num, slf_action_spiderman_set_hero_meter_empty_rate_num, (void*)0x89cb44);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_max_height_num, slf_action_spiderman_set_max_height_num, (void*)0x89c9cc);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_max_zip_length_num, slf_action_spiderman_set_max_zip_length_num, (void*)0x89c9d4);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_min_height_num, slf_action_spiderman_set_min_height_num, (void*)0x89c9c4);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_spidey_sense_level_num, slf_action_spiderman_set_spidey_sense_level_num, (void*)0x89c994);
+	hook_slf_vtable(slf_deconstructor_spiderman_set_swing_anchor_max_sticky_time_num, slf_action_spiderman_set_swing_anchor_max_sticky_time_num, (void*)0x89c9a4);
+	hook_slf_vtable(slf_deconstructor_spiderman_subtract_hero_points_num, slf_action_spiderman_subtract_hero_points_num, (void*)0x89caac);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_alternating_wall_run_occurrence_threshold_num, slf_action_spiderman_td_set_alternating_wall_run_occurrence_threshold_num, (void*)0x89ca74);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_alternating_wall_run_time_threshold_num, slf_action_spiderman_td_set_alternating_wall_run_time_threshold_num, (void*)0x89ca6c);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_big_air_height_threshold_num, slf_action_spiderman_td_set_big_air_height_threshold_num, (void*)0x89ca34);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_continuous_air_swings_threshold_num, slf_action_spiderman_td_set_continuous_air_swings_threshold_num, (void*)0x89ca4c);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_gain_altitude_height_threshold_num, slf_action_spiderman_td_set_gain_altitude_height_threshold_num, (void*)0x89ca54);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_near_miss_trigger_radius_num, slf_action_spiderman_td_set_near_miss_trigger_radius_num, (void*)0x89ca84);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_near_miss_velocity_threshold_num, slf_action_spiderman_td_set_near_miss_velocity_threshold_num, (void*)0x89ca8c);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_orbit_min_radius_threshold_num, slf_action_spiderman_td_set_orbit_min_radius_threshold_num, (void*)0x89ca3c);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_soft_landing_velocity_threshold_num, slf_action_spiderman_td_set_soft_landing_velocity_threshold_num, (void*)0x89ca5c);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_super_speed_speed_threshold_num, slf_action_spiderman_td_set_super_speed_speed_threshold_num, (void*)0x89ca7c);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_swinging_wall_run_time_threshold_num, slf_action_spiderman_td_set_swinging_wall_run_time_threshold_num, (void*)0x89ca64);
+	hook_slf_vtable(slf_deconstructor_spiderman_td_set_wall_sprint_time_threshold_num, slf_action_spiderman_td_set_wall_sprint_time_threshold_num, (void*)0x89ca44);
+	hook_slf_vtable(slf_deconstructor_spiderman_unlock_spider_reflexes, slf_action_spiderman_unlock_spider_reflexes, (void*)0x89ca2c);
+	hook_slf_vtable(slf_deconstructor_spiderman_wait_add_threat_entity_str_num_num, slf_action_spiderman_wait_add_threat_entity_str_num_num, (void*)0x89cb4c);
+	hook_slf_vtable(slf_deconstructor_spidey_can_see_vector3d, slf_action_spidey_can_see_vector3d, (void*)0x89c92c);
+	hook_slf_vtable(slf_deconstructor_sqrt_num, slf_action_sqrt_num, (void*)0x89a914);
+	hook_slf_vtable(slf_deconstructor_start_patrol_str, slf_action_start_patrol_str, (void*)0x89c4f4);
+	hook_slf_vtable(slf_deconstructor_stop_all_sounds, slf_action_stop_all_sounds, (void*)0x89b514);
+	hook_slf_vtable(slf_deconstructor_stop_credits, slf_action_stop_credits, (void*)0x89bb00);
+	hook_slf_vtable(slf_deconstructor_stop_vibration, slf_action_stop_vibration, (void*)0x89a7cc);
+	hook_slf_vtable(slf_deconstructor_subtitle_num_num_num_num_num_num, slf_action_subtitle_num_num_num_num_num_num, (void*)0x89bcc4);
+	hook_slf_vtable(slf_deconstructor_swap_hero_costume_str, slf_action_swap_hero_costume_str, (void*)0x89c4d4);
+	hook_slf_vtable(slf_deconstructor_text_width_str, slf_action_text_width_str, (void*)0x89a7ac);
+	hook_slf_vtable(slf_deconstructor_timer_widget_get_count_up, slf_action_timer_widget_get_count_up, (void*)0x89bb70);
+	hook_slf_vtable(slf_deconstructor_timer_widget_get_time, slf_action_timer_widget_get_time, (void*)0x89bb60);
+	hook_slf_vtable(slf_deconstructor_timer_widget_set_count_up_num, slf_action_timer_widget_set_count_up_num, (void*)0x89bb68);
+	hook_slf_vtable(slf_deconstructor_timer_widget_set_time_num, slf_action_timer_widget_set_time_num, (void*)0x89bb58);
+	hook_slf_vtable(slf_deconstructor_timer_widget_start, slf_action_timer_widget_start, (void*)0x89bb48);
+	hook_slf_vtable(slf_deconstructor_timer_widget_stop, slf_action_timer_widget_stop, (void*)0x89bb50);
+	hook_slf_vtable(slf_deconstructor_timer_widget_turn_off, slf_action_timer_widget_turn_off, (void*)0x89bb40);
+	hook_slf_vtable(slf_deconstructor_timer_widget_turn_on, slf_action_timer_widget_turn_on, (void*)0x89bb38);
+	hook_slf_vtable(slf_deconstructor_to_beam_entity, slf_action_to_beam_entity, (void*)0x89abbc);
+	hook_slf_vtable(slf_deconstructor_to_gun_entity, slf_action_to_gun_entity, (void*)0x89b5a0);
+	hook_slf_vtable(slf_deconstructor_to_item_entity, slf_action_to_item_entity, (void*)0x89b6bc);
+	hook_slf_vtable(slf_deconstructor_to_polytube_entity, slf_action_to_polytube_entity, (void*)0x89c238);
+	hook_slf_vtable(slf_deconstructor_to_switch_entity, slf_action_to_switch_entity, (void*)0x89b8e4);
+	hook_slf_vtable(slf_deconstructor_trace_str, slf_action_trace_str, (void*)0x89aa14);
+	hook_slf_vtable(slf_deconstructor_trigger_is_valid_trigger, slf_action_trigger_is_valid_trigger, (void*)0x89b9b8);
+	hook_slf_vtable(slf_deconstructor_turn_off_boss_health, slf_action_turn_off_boss_health, (void*)0x89bbd0);
+	hook_slf_vtable(slf_deconstructor_turn_off_hero_health, slf_action_turn_off_hero_health, (void*)0x89bbd8);
+	hook_slf_vtable(slf_deconstructor_turn_off_mission_text, slf_action_turn_off_mission_text, (void*)0x89bc20);
+	hook_slf_vtable(slf_deconstructor_turn_off_third_party_health, slf_action_turn_off_third_party_health, (void*)0x89bbe0);
+	hook_slf_vtable(slf_deconstructor_turn_on_boss_health_num_entity, slf_action_turn_on_boss_health_num_entity, (void*)0x89bbb8);
+	hook_slf_vtable(slf_deconstructor_turn_on_hero_health_num_entity, slf_action_turn_on_hero_health_num_entity, (void*)0x89bbc0);
+	hook_slf_vtable(slf_deconstructor_turn_on_third_party_health_num_entity, slf_action_turn_on_third_party_health_num_entity, (void*)0x89bbc8);
+	hook_slf_vtable(slf_deconstructor_unload_script, slf_action_unload_script, (void*)0x89c35c);
+	hook_slf_vtable(slf_deconstructor_unlock_all_exterior_districts, slf_action_unlock_all_exterior_districts, (void*)0x89c4cc);
+	hook_slf_vtable(slf_deconstructor_unlock_district_num, slf_action_unlock_district_num, (void*)0x89c48c);
+	hook_slf_vtable(slf_deconstructor_vibrate_controller_num, slf_action_vibrate_controller_num, (void*)0x89a7c4);
+	hook_slf_vtable(slf_deconstructor_vibrate_controller_num_num, slf_action_vibrate_controller_num_num, (void*)0x89a7bc);
+	hook_slf_vtable(slf_deconstructor_vibrate_controller_num_num_num_num_num_num, slf_action_vibrate_controller_num_num_num_num_num_num, (void*)0x89a7b4);
+	hook_slf_vtable(slf_deconstructor_vo_delay_num_num_num_num, slf_action_vo_delay_num_num_num_num, (void*)0x89a734);
+	hook_slf_vtable(slf_deconstructor_wait_animate_fog_color_vector3d_num, slf_action_wait_animate_fog_color_vector3d_num, (void*)0x89a6fc);
+	hook_slf_vtable(slf_deconstructor_wait_animate_fog_distance_num_num, slf_action_wait_animate_fog_distance_num_num, (void*)0x89a704);
+	hook_slf_vtable(slf_deconstructor_wait_animate_fog_distances_num_num_num, slf_action_wait_animate_fog_distances_num_num_num, (void*)0x89a70c);
+	hook_slf_vtable(slf_deconstructor_wait_change_blur_num_vector3d_num_num_num_num_num_num, slf_action_wait_change_blur_num_vector3d_num_num_num_num_num_num, (void*)0x89a66c);
+	hook_slf_vtable(slf_deconstructor_wait_change_spider_reflexes_blur_num_vector3d_num_num_num_num_num_num, slf_action_wait_change_spider_reflexes_blur_num_vector3d_num_num_num_num_num_num, (void*)0x89a6a4);
+	hook_slf_vtable(slf_deconstructor_wait_for_streamer_to_reach_equilibrium, slf_action_wait_for_streamer_to_reach_equilibrium, (void*)0x89c4a4);
+	hook_slf_vtable(slf_deconstructor_wait_fps_test_num_num_vector3d_vector3d, slf_action_wait_fps_test_num_num_vector3d_vector3d, (void*)0x89a8ec);
+	hook_slf_vtable(slf_deconstructor_wait_frame, slf_action_wait_frame, (void*)0x89a714);
+	hook_slf_vtable(slf_deconstructor_wait_set_global_time_dilation_num_num, slf_action_wait_set_global_time_dilation_num_num, (void*)0x89a8a4);
+	hook_slf_vtable(slf_deconstructor_wait_set_zoom_num_num, slf_action_wait_set_zoom_num_num, (void*)0x89a634);
+	hook_slf_vtable(slf_deconstructor_write_to_file_str_str, slf_action_write_to_file_str_str, (void*)0x89a844);
+
+
+}
+
 void install_patches() {
 
 	HookFunc(0x004EACF0, aeps_RenderAll, 0, "Patching call to aeps::RenderAll");
@@ -1437,6 +1911,11 @@ void install_patches() {
 
 	*/
 
+
+#ifdef _DEBUG
+	hook_slf_vtables();
+#endif
+
 }
 
 void close_debug() {
@@ -1453,7 +1932,6 @@ entity_tracker_manager_get_the_arrow_target_pos_ptr entity_tracker_manager_get_t
 
 void handle_warp_entry(debug_menu_entry* entry) {
 	
-
 	float position[] = {
 		0, -0, 1, 0,
 		1, -0, -0, 0,
