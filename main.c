@@ -2128,8 +2128,8 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID reserverd) {
 			return FALSE;
 		}
 
-		/*
 		setup_debug_menu();
+		/*
 		set_text_writeable();
 		set_rdata_writeable();
 		install_patches();
