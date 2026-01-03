@@ -2123,7 +2123,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID reserverd) {
 		AllocConsole();
 
 
-
+		/*
 		if (!freopen("CONOUT$", "w", stdout)) {
 			MessageBoxA(NULL, "Error", "Couldn't allocate console...Closing", 0);
 			return FALSE;
@@ -2133,6 +2133,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD fdwReason, LPVOID reserverd) {
 		set_text_writeable();
 		set_rdata_writeable();
 		install_patches();
+		*/
 
 	}
 	else if (fdwReason == DLL_PROCESS_DETACH)

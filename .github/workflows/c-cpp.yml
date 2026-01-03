@@ -2,7 +2,7 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ debug_steamdeck_crash ]
   pull_request:
     branches: [ master ]
 
